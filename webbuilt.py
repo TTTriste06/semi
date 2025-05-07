@@ -211,41 +211,41 @@ def main():
         upload_to_github(mapping_file, "mapping_file.xlsx", "上传新旧料号文件")
         
     if st.button('提交并生成报告') and uploaded_files:
-    with pd.ExcelWriter(CONFIG['output_file'], engine='openpyxl') as writer:
-        # 处理 5 个主文件
-        for f in uploaded_files:
-            filename = f.name
-            if filename not in CONFIG['pivot_config']:
-                st.warning(f"跳过未配置的文件: {filename}")
-                continue
-            df = pd.read_excel(f)
-            config = CONFIG['pivot_config'][filename]
-            if 'date_format' in config and config['columns'] in df.columns:
-                df = process_date_column(df, config['columns'], config['date_format'])
-            pivoted = create_pivot(df, config, filename)
-            sheet_name = filename[:30].rstrip('.xlsx')
-            pivoted.to_excel(writer, sheet_name=sheet_name, index=False)
-            adjust_column_width(writer, sheet_name, pivoted)
-        
-        # 添加安全库存 sheet
-        if safety_file:
-            df_safety = pd.read_excel(safety_file)
-            df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
-            adjust_column_width(writer, '赛卓-安全库存', df_safety)
-
-        # 添加预测文件 sheet
-        if pred_file:
-            df_pred = pd.read_excel(pred_file)
-            df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
-            adjust_column_width(writer, '赛卓-预测', df_pred)
-
-        # 添加新旧料号 sheet
-        if mapping_file:
-            df_mapping = pd.read_excel(mapping_file)
-            df_mapping = preprocess_mapping_file(df_mapping)  # 用前面写的函数
-            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False)
-            adjust_column_width(writer, '赛卓-新旧料号', df_mapping)
-
+        with pd.ExcelWriter(CONFIG['output_file'], engine='openpyxl') as writer:
+            # 处理 5 个主文件
+            for f in uploaded_files:
+                filename = f.name
+                if filename not in CONFIG['pivot_config']:
+                    st.warning(f"跳过未配置的文件: {filename}")
+                    continue
+                df = pd.read_excel(f)
+                config = CONFIG['pivot_config'][filename]
+                if 'date_format' in config and config['columns'] in df.columns:
+                    df = process_date_column(df, config['columns'], config['date_format'])
+                pivoted = create_pivot(df, config, filename)
+                sheet_name = filename[:30].rstrip('.xlsx')
+                pivoted.to_excel(writer, sheet_name=sheet_name, index=False)
+                adjust_column_width(writer, sheet_name, pivoted)
+            
+            # 添加安全库存 sheet
+            if safety_file:
+                df_safety = pd.read_excel(safety_file)
+                df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
+                adjust_column_width(writer, '赛卓-安全库存', df_safety)
+    
+            # 添加预测文件 sheet
+            if pred_file:
+                df_pred = pd.read_excel(pred_file)
+                df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
+                adjust_column_width(writer, '赛卓-预测', df_pred)
+    
+            # 添加新旧料号 sheet
+            if mapping_file:
+                df_mapping = pd.read_excel(mapping_file)
+                df_mapping = preprocess_mapping_file(df_mapping)  # 用前面写的函数
+                df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False)
+                adjust_column_width(writer, '赛卓-新旧料号', df_mapping)
+    
         with open(CONFIG['output_file'], 'rb') as f:
             st.download_button('下载汇总报告', f, CONFIG['output_file'])
 
