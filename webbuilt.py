@@ -208,17 +208,6 @@ def main():
                 pivoted.to_excel(writer, sheet_name=sheet_name, index=False)
                 adjust_column_width(writer, sheet_name, pivoted)
 
-            # 保存新增三个文件到 Excel （可选，根据需要处理）
-            if 'pred_file_data' in st.session_state:
-                pred_df = pd.read_excel(st.session_state['pred_file_data'])
-                pred_df.to_excel(writer, sheet_name='预测文件', index=False)
-            if 'safety_file_data' in st.session_state:
-                safety_df = pd.read_excel(st.session_state['safety_file_data'])
-                safety_df.to_excel(writer, sheet_name='安全库存', index=False)
-            if 'mapping_file_data' in st.session_state:
-                mapping_df = pd.read_excel(st.session_state['mapping_file_data'])
-                mapping_df.to_excel(writer, sheet_name='新旧料号', index=False)
-
         with open(CONFIG['output_file'], 'rb') as f:
             st.download_button('下载汇总报告', f, CONFIG['output_file'])
 
