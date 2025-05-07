@@ -6,7 +6,6 @@ import base64
 from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
 
-GITHUB_TOKEN = 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
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
 REPO_NAME = "TTTriste06/semi"
 BRANCH = "main"
