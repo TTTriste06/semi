@@ -192,17 +192,16 @@ def main():
     selected_month = st.text_input('请输入截至月份（如 2025-03，可选）')
     CONFIG['selected_month'] = selected_month if selected_month else None
 
-    # 文件上传
+    # 文件上传&保存到 GitHub 的按钮
     uploaded_files = st.file_uploader('上传 Excel 文件（5个文件）', type=['xlsx'], accept_multiple_files=True)
+    
     pred_file = st.file_uploader('上传预测文件', type=['xlsx'], key='pred_file')
-    safety_file = st.file_uploader('上传安全库存文件', type=['xlsx'], key='safety_file')
-    mapping_file = st.file_uploader('上传新旧料号文件', type=['xlsx'], key='mapping_file')
-
-    # 保存到 GitHub 的按钮
     if pred_file and st.button("保存预测文件到 GitHub"):
         upload_to_github(pred_file, "pred_file.xlsx", "上传预测文件")
+    safety_file = st.file_uploader('上传安全库存文件', type=['xlsx'], key='safety_file')
     if safety_file and st.button("保存安全库存文件到 GitHub"):
         upload_to_github(safety_file, "safety_file.xlsx", "上传安全库存文件")
+    mapping_file = st.file_uploader('上传新旧料号文件', type=['xlsx'], key='mapping_file')
     if mapping_file and st.button("保存新旧料号文件到 GitHub"):
         upload_to_github(mapping_file, "mapping_file.xlsx", "上传新旧料号文件")
 
