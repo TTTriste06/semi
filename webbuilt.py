@@ -135,7 +135,6 @@ def main():
     with st.sidebar:
         st.title("欢迎来到我的应用")
         st.markdown('---')
-        st.markdown('这是它的特性：\n- feature 1\n- feature 2\n- feature 3')
 
     st.title('Excel 数据处理与汇总工具')
     selected_month = st.text_input('请输入截至月份（如 2025-03，可选）')
