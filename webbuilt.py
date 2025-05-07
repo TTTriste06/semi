@@ -136,7 +136,7 @@ def apply_mapping_and_merge(df, mapping_df):
     
     return df_merged
 
-def create_pivot(df, config, filename):
+def create_pivot(df, config, filename, mapping_df=None):
     if 'date_format' in config:
         config = config.copy()
         config['columns'] = f"{config['columns']}_年月"
@@ -144,11 +144,10 @@ def create_pivot(df, config, filename):
                              aggfunc=config['aggfunc'], fill_value=0)
     pivoted.columns = [f"{col[0]}_{col[1]}" if isinstance(col, tuple) else col for col in pivoted.columns]
     pivoted = pivoted.reset_index()
-    
-    if filename == "赛卓-未交订单.xlsx":
-        if '规格' in pivoted.columns and '品名' in pivoted.columns and '晶圆品名' in pivoted.columns:
-            pivoted = apply_mapping_and_merge(pivoted, MAPPING_TABLE)
-    
+
+    if mapping_df is not None and filename == "赛卓-未交订单.xlsx":
+        pivoted = apply_mapping_and_merge(pivoted, mapping_df)
+
     if CONFIG['selected_month'] and filename == "赛卓-未交订单.xlsx":
         history_cols = [col for col in pivoted.columns if '_' in col and col.split('_')[-1][:4].isdigit() and col.split('_')[-1] < CONFIG['selected_month']]
         history_order_cols = [col for col in history_cols if '订单数量' in col and '未交订单数量' not in col]
@@ -164,9 +163,8 @@ def create_pivot(df, config, filename):
         if '历史未交订单数量' in pivoted.columns:
             fixed_cols.insert(len(config['index']) + 1, '历史未交订单数量')
         pivoted = pivoted[fixed_cols]
-    
-    return pivoted
 
+    return pivoted
 
 def adjust_column_width(writer, sheet_name, df):
     worksheet = writer.sheets[sheet_name]
@@ -192,23 +190,26 @@ def main():
     selected_month = st.text_input('请输入截至月份（如 2025-03，可选）')
     CONFIG['selected_month'] = selected_month if selected_month else None
 
-    # 文件上传&保存到 GitHub 的按钮
     uploaded_files = st.file_uploader('上传 Excel 文件（5个文件）', type=['xlsx'], accept_multiple_files=True)
-    
     pred_file = st.file_uploader('上传预测文件', type=['xlsx'], key='pred_file')
+    safety_file = st.file_uploader('上传安全库存文件', type=['xlsx'], key='safety_file')
+    mapping_file = st.file_uploader('上传新旧料号文件', type=['xlsx'], key='mapping_file')
+
+    # 加载 mapping_file DataFrame
+    mapping_df = None
+    if mapping_file:
+        mapping_df = pd.read_excel(mapping_file)
+        mapping_df = preprocess_mapping_file(mapping_df)
+
     if pred_file and st.button("保存预测文件到 GitHub"):
         upload_to_github(pred_file, "pred_file.xlsx", "上传预测文件")
-    safety_file = st.file_uploader('上传安全库存文件', type=['xlsx'], key='safety_file')
     if safety_file and st.button("保存安全库存文件到 GitHub"):
         upload_to_github(safety_file, "safety_file.xlsx", "上传安全库存文件")
-    mapping_file = st.file_uploader('上传新旧料号文件', type=['xlsx'], key='mapping_file')
     if mapping_file and st.button("保存新旧料号文件到 GitHub"):
         upload_to_github(mapping_file, "mapping_file.xlsx", "上传新旧料号文件")
 
-    # 提交并生成报告
     if st.button('提交并生成报告') and uploaded_files:
         with pd.ExcelWriter(CONFIG['output_file'], engine='openpyxl') as writer:
-            # 主文件处理
             for f in uploaded_files:
                 filename = f.name
                 if filename not in CONFIG['pivot_config']:
@@ -218,35 +219,24 @@ def main():
                 config = CONFIG['pivot_config'][filename]
                 if 'date_format' in config and config['columns'] in df.columns:
                     df = process_date_column(df, config['columns'], config['date_format'])
-                pivoted = create_pivot(df, config, filename)
+                pivoted = create_pivot(df, config, filename, mapping_df)
                 sheet_name = filename[:30].rstrip('.xlsx')
                 pivoted.to_excel(writer, sheet_name=sheet_name, index=False)
                 adjust_column_width(writer, sheet_name, pivoted)
 
-            # 安全库存 sheet
             if safety_file:
                 df_safety = pd.read_excel(safety_file)
                 df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
                 adjust_column_width(writer, '赛卓-安全库存', df_safety)
-            else:
-                st.warning("未上传安全库存文件，跳过添加 赛卓-安全库存 sheet")
 
-            # 预测文件 sheet
             if pred_file:
                 df_pred = pd.read_excel(pred_file)
                 df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
                 adjust_column_width(writer, '赛卓-预测', df_pred)
-            else:
-                st.warning("未上传预测文件，跳过添加 赛卓-预测 sheet")
 
-            # 新旧料号 sheet
-            if mapping_file:
-                df_mapping = pd.read_excel(mapping_file)
-                df_mapping = preprocess_mapping_file(df_mapping)
-                df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False)
-                adjust_column_width(writer, '赛卓-新旧料号', df_mapping)
-            else:
-                st.warning("未上传新旧料号文件，跳过添加 赛卓-新旧料号 sheet")
+            if mapping_df is not None:
+                mapping_df.to_excel(writer, sheet_name='赛卓-新旧料号', index=False)
+                adjust_column_width(writer, '赛卓-新旧料号', mapping_df)
 
         with open(CONFIG['output_file'], 'rb') as f:
             st.download_button('下载汇总报告', f, CONFIG['output_file'])
