@@ -63,6 +63,7 @@ def process_date_column(df, date_col, date_format):
 
 def apply_mapping_and_merge(df, mapping_df):
     mapping_df = mapping_df.dropna()
+    
     df = df.merge(
         mapping_df,
         how='left',
@@ -90,10 +91,12 @@ def create_pivot(df, config, filename):
                              aggfunc=config['aggfunc'], fill_value=0)
     pivoted.columns = [f"{col[0]}_{col[1]}" if isinstance(col, tuple) else col for col in pivoted.columns]
     pivoted = pivoted.reset_index()
+    
     if filename == "赛卓-未交订单.xlsx":
         if '规格' in pivoted.columns and '品名' in pivoted.columns and '晶圆品名' in pivoted.columns:
             pivoted = apply_mapping_and_merge(pivoted, MAPPING_TABLE)
-    if CONFIG['selected_month']:
+    
+    if CONFIG['selected_month'] and filename == "赛卓-未交订单.xlsx":
         history_cols = [col for col in pivoted.columns if '_' in col and col.split('_')[-1][:4].isdigit() and col.split('_')[-1] < CONFIG['selected_month']]
         history_order_cols = [col for col in history_cols if '订单数量' in col and '未交订单数量' not in col]
         history_pending_cols = [col for col in history_cols if '未交订单数量' in col]
@@ -108,7 +111,9 @@ def create_pivot(df, config, filename):
         if '历史未交订单数量' in pivoted.columns:
             fixed_cols.insert(len(config['index']) + 1, '历史未交订单数量')
         pivoted = pivoted[fixed_cols]
+    
     return pivoted
+
 
 def adjust_column_width(writer, sheet_name, df):
     worksheet = writer.sheets[sheet_name]
@@ -128,11 +133,33 @@ def main():
     with st.sidebar:
         st.title("欢迎来到我的应用")
         st.markdown('---')
+        st.markdown('这是它的特性：\n- feature 1\n- feature 2\n- feature 3')
 
     st.title('Excel 数据处理与汇总工具')
     selected_month = st.text_input('请输入截至月份（如 2025-03，可选）')
     CONFIG['selected_month'] = selected_month if selected_month else None
-    uploaded_files = st.file_uploader('上传 Excel 文件（最多 5 个）', type=['xlsx'], accept_multiple_files=True)
+
+    # 普通 5个文件的上传
+    uploaded_files = st.file_uploader('上传 Excel 文件（5个文件）', type=['xlsx'], accept_multiple_files=True)
+
+    # 新增三个 upload 框，用 session_state 保存文件内容
+    pred_file = st.file_uploader('上传预测文件', type=['xlsx'], key='pred_file')
+    if pred_file:
+        st.session_state['pred_file_data'] = pred_file
+
+    safety_file = st.file_uploader('上传安全库存文件', type=['xlsx'], key='safety_file')
+    if safety_file:
+        st.session_state['safety_file_data'] = safety_file
+
+    mapping_file = st.file_uploader('上传新旧料号文件', type=['xlsx'], key='mapping_file')
+    if mapping_file:
+        st.session_state['mapping_file_data'] = mapping_file
+
+    # 显示当前保存的文件名（如果存在）
+    st.write("当前保存的预测文件:", getattr(st.session_state.get('pred_file_data'), 'name', '无'))
+    st.write("当前保存的安全库存文件:", getattr(st.session_state.get('safety_file_data'), 'name', '无'))
+    st.write("当前保存的新旧料号文件:", getattr(st.session_state.get('mapping_file_data'), 'name', '无'))
+
     if st.button('提交并生成报告') and uploaded_files:
         with pd.ExcelWriter(CONFIG['output_file'], engine='openpyxl') as writer:
             for f in uploaded_files:
@@ -148,6 +175,18 @@ def main():
                 sheet_name = filename[:30].rstrip('.xlsx')
                 pivoted.to_excel(writer, sheet_name=sheet_name, index=False)
                 adjust_column_width(writer, sheet_name, pivoted)
+
+            # 保存新增三个文件到 Excel （可选，根据需要处理）
+            if 'pred_file_data' in st.session_state:
+                pred_df = pd.read_excel(st.session_state['pred_file_data'])
+                pred_df.to_excel(writer, sheet_name='预测文件', index=False)
+            if 'safety_file_data' in st.session_state:
+                safety_df = pd.read_excel(st.session_state['safety_file_data'])
+                safety_df.to_excel(writer, sheet_name='安全库存', index=False)
+            if 'mapping_file_data' in st.session_state:
+                mapping_df = pd.read_excel(st.session_state['mapping_file_data'])
+                mapping_df.to_excel(writer, sheet_name='新旧料号', index=False)
+
         with open(CONFIG['output_file'], 'rb') as f:
             st.download_button('下载汇总报告', f, CONFIG['output_file'])
 
