@@ -1,8 +1,16 @@
 import os
 import streamlit as st
 import pandas as pd
+import requests
+import base64
 from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
+
+GITHUB_TOKEN=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
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
+REPO_NAME = "TTTriste06/semi"
+BRANCH = "main"
+
 
 MAPPING_TABLE = pd.DataFrame({
     '旧规格': ['规格', 'SC1133UA', 'SC1134UA', 'SC1134UA', 'SC1134UA', 'SC1134UA', 'SC1134UA', 'SC1134BU', 'SC1134UA', 'SC1134UA', 'SC1134BU', 'SC1134BU', 'SC1134UA', 'SC1138UA', 'SC2442SO', 'SC2442SO', 'SC2442SO', 'SC2442SO', 'SC243XUA', 'SC2430UA', 'SC2402UA', 'SC2526', 'SC2546', 'SC2402UA', 'SC2442UA', 'SC2442UA', 'SC2442UA', 'SC2448UA-N', 'SC2443UA', 'SC2443UA', 'SC2432UA', 'SC2434SO', 'SC2434SO-N', 'SC2434UA', 'SC2436SO', 'SC2436UA', 'SC2242SO', 'SC2642SO', 'SC2242UA', 'SC2462UA', 'SC2464UA', 'SC2448UA-N', 'SC2462UA', 'SC2498CUA-N', 'SC2438UA', 'SC2442UA', 'SC2242UA', 'SC2063UA', '2100', 'KH211', 'KH211', 'SD211VB', 'SC2526VB', 'SC2526VB', 'SC2526VB', 'SC2546VB', 'SC9621VB-A', 'SC9621VB-A', 'SC9621VB', 'SC9621VB-A', 'SC9625VB', 'SC9625VB-L', 'SC9625VB', 'SC9625VB-L', 'SC9675IM-P-HRF00', 'SC9675IM-P-HRF11', 'SC9675IM-P-LRF00', 'SC9675IM-P-LRF01', 'SC9675IM-P-LRF10', 'SC9675VB', 'SC243XCVB-A', 'SC4645VB-12S', 'SC4645VB-5S', 'SC4665VB', 'SC9632VB', 'SC9633VB', 'SC9634VB', 'SC9634VB', 'SC9634VB', 'SD2276', 'SD2276', 'SD2276', 'SD477S', 'SD477S', 'SD477S', 'KH477ST4-G', 'KH477ST4-G', 'SC4643VB-A', 'SC4643VB-A', 'SC4643VB-A', 'SC4643VB-A', 'SC4643VB-P', 'SC4643VB-P', 'SC4643VB-G', 'SC4643VB-G', 'SC4643VB-S', 'SC4643VB-S', 'SC4643VB-S', 'SC1945NB1', 'SC1945NB1', 'SC1645A1', 'SC1645A1', 'S41F1', 'S41F1', 'SC9642TS-EC', 'SC4643VB-G', 'SC4688SA', 'SC4643VB-P', 'SC1002F1', 'SC1245UA', 'SC1445A1', 'SC1645B1', 'SC1645B2', 'SC2432SO-N', 'SC243XUA', 'SC2442SO', 'SC2442SO-N', 'SC2443UA', 'SC2448SO', 'SC2462SO', 'SC2464SO', 'SC2466SO', 'SC2498SO', 'SC2498TSO', 'SC2498UA-N', 'SC4001SE', 'SC4002BU', 'SC4251D3', 'CA-IS23025S', 'CA-IS23050S', 'SC4643VB-S', 'SC4695DC', 'SC60220', 'SC60228DC', 'SC9314UA', 'SC9314UA', 'SC1138SO-N', 'SC1138SO-N', 'SC1134SO-N', 'SC1134SO-N', 'SC1245SO-N', 'SC2033SO-N', 'SC2063SO', 'SC2064SO', 'SC2202SO-N', 'SC2402SO-N', 'SC2402SO-N', 'SC2402SO-N', 'SC2402SO-N', 'SC2402SO-N', 'SC2402SO-N', 'SC2402SO-N', 'SC2402SO-N', 'SC2402SO-N', 'SC9641TS-PC', 'SC9641TS-PC', 'SC9641TS', 'SC9641TS', 'NP.SC4688SA-888K', 'SC4688DC', 'SC4688DC', 'SC4688SA', 'SC4688SA', 'SC4688SA-A', 'SC4688SA-A', 'SC4688SA-A', 'SC4688SA-A'],
@@ -52,6 +60,36 @@ CONFIG = {
         }
     }
 }
+
+def upload_to_github(file, path_in_repo, commit_message):
+    api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{path_in_repo}"
+    file_content = file.read()
+    encoded_content = base64.b64encode(file_content).decode('utf-8')
+
+    response = requests.get(api_url, headers={
+        "Authorization": f"token {GITHUB_TOKEN}"
+    })
+    if response.status_code == 200:
+        sha = response.json()['sha']
+    else:
+        sha = None
+
+    payload = {
+        "message": commit_message,
+        "content": encoded_content,
+        "branch": BRANCH
+    }
+    if sha:
+        payload["sha"] = sha
+
+    response = requests.put(api_url, json=payload, headers={
+        "Authorization": f"token {GITHUB_TOKEN}"
+    })
+
+    if response.status_code in [200, 201]:
+        st.success(f"{path_in_repo} 上传成功！")
+    else:
+        st.error(f"上传失败: {response.json()}")
 
 def process_date_column(df, date_col, date_format):
     if pd.api.types.is_numeric_dtype(df[date_col]):
@@ -142,24 +180,18 @@ def main():
     # 普通 5个文件的上传
     uploaded_files = st.file_uploader('上传 Excel 文件（5个文件）', type=['xlsx'], accept_multiple_files=True)
 
-    # 新增三个 upload 框，用 session_state 保存文件内容
     pred_file = st.file_uploader('上传预测文件', type=['xlsx'], key='pred_file')
-    if pred_file:
-        st.session_state['pred_file_data'] = pred_file
-
+    if pred_file and st.button("保存预测文件到 GitHub"):
+        upload_to_github(pred_file, "pred_file.xlsx", "上传预测文件")
+    
     safety_file = st.file_uploader('上传安全库存文件', type=['xlsx'], key='safety_file')
-    if safety_file:
-        st.session_state['safety_file_data'] = safety_file
-
+    if safety_file and st.button("保存安全库存文件到 GitHub"):
+        upload_to_github(safety_file, "safety_file.xlsx", "上传安全库存文件")
+    
     mapping_file = st.file_uploader('上传新旧料号文件', type=['xlsx'], key='mapping_file')
-    if mapping_file:
-        st.session_state['mapping_file_data'] = mapping_file
-
-    # 显示当前保存的文件名（如果存在）
-    st.write("当前保存的预测文件:", getattr(st.session_state.get('pred_file_data'), 'name', '无'))
-    st.write("当前保存的安全库存文件:", getattr(st.session_state.get('safety_file_data'), 'name', '无'))
-    st.write("当前保存的新旧料号文件:", getattr(st.session_state.get('mapping_file_data'), 'name', '无'))
-
+    if mapping_file and st.button("保存新旧料号文件到 GitHub"):
+        upload_to_github(mapping_file, "mapping_file.xlsx", "上传新旧料号文件")
+        
     if st.button('提交并生成报告') and uploaded_files:
         with pd.ExcelWriter(CONFIG['output_file'], engine='openpyxl') as writer:
             for f in uploaded_files:
