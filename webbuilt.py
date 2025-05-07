@@ -188,73 +188,70 @@ def main():
         st.markdown('---')
         st.markdown('这是它的特性：\n- feature 1\n- feature 2\n- feature 3')
 
-    global MAPPING_TABLE
-    MAPPING_TABLE = download_mapping_from_github("mapping_file.xlsx")
-    
     st.title('Excel 数据处理与汇总工具')
     selected_month = st.text_input('请输入截至月份（如 2025-03，可选）')
     CONFIG['selected_month'] = selected_month if selected_month else None
 
-    # 普通 5个文件的上传
+    # 文件上传
     uploaded_files = st.file_uploader('上传 Excel 文件（5个文件）', type=['xlsx'], accept_multiple_files=True)
-
     pred_file = st.file_uploader('上传预测文件', type=['xlsx'], key='pred_file')
+    safety_file = st.file_uploader('上传安全库存文件', type=['xlsx'], key='safety_file')
+    mapping_file = st.file_uploader('上传新旧料号文件', type=['xlsx'], key='mapping_file')
+
+    # 保存到 GitHub 的按钮
     if pred_file and st.button("保存预测文件到 GitHub"):
         upload_to_github(pred_file, "pred_file.xlsx", "上传预测文件")
-    
-    safety_file = st.file_uploader('上传安全库存文件', type=['xlsx'], key='safety_file')
     if safety_file and st.button("保存安全库存文件到 GitHub"):
         upload_to_github(safety_file, "safety_file.xlsx", "上传安全库存文件")
-    
-    mapping_file = st.file_uploader('上传新旧料号文件', type=['xlsx'], key='mapping_file')
     if mapping_file and st.button("保存新旧料号文件到 GitHub"):
         upload_to_github(mapping_file, "mapping_file.xlsx", "上传新旧料号文件")
-        
+
+    # 提交并生成报告
     if st.button('提交并生成报告') and uploaded_files:
-    with pd.ExcelWriter(CONFIG['output_file'], engine='openpyxl') as writer:
-        # 处理主文件
-        for f in uploaded_files:
-            filename = f.name
-            if filename not in CONFIG['pivot_config']:
-                st.warning(f"跳过未配置的文件: {filename}")
-                continue
-            df = pd.read_excel(f)
-            config = CONFIG['pivot_config'][filename]
-            if 'date_format' in config and config['columns'] in df.columns:
-                df = process_date_column(df, config['columns'], config['date_format'])
-            pivoted = create_pivot(df, config, filename)
-            sheet_name = filename[:30].rstrip('.xlsx')
-            pivoted.to_excel(writer, sheet_name=sheet_name, index=False)
-            adjust_column_width(writer, sheet_name, pivoted)
-        
-        # 写入安全库存 sheet
-        if safety_file:
-            df_safety = pd.read_excel(safety_file)
-            df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
-            adjust_column_width(writer, '赛卓-安全库存', df_safety)
-        else:
-            st.warning("未上传安全库存文件，跳过添加 赛卓-安全库存 sheet")
+        with pd.ExcelWriter(CONFIG['output_file'], engine='openpyxl') as writer:
+            # 主文件处理
+            for f in uploaded_files:
+                filename = f.name
+                if filename not in CONFIG['pivot_config']:
+                    st.warning(f"跳过未配置的文件: {filename}")
+                    continue
+                df = pd.read_excel(f)
+                config = CONFIG['pivot_config'][filename]
+                if 'date_format' in config and config['columns'] in df.columns:
+                    df = process_date_column(df, config['columns'], config['date_format'])
+                pivoted = create_pivot(df, config, filename)
+                sheet_name = filename[:30].rstrip('.xlsx')
+                pivoted.to_excel(writer, sheet_name=sheet_name, index=False)
+                adjust_column_width(writer, sheet_name, pivoted)
 
-        # 写入预测文件 sheet
-        if pred_file:
-            df_pred = pd.read_excel(pred_file)
-            df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
-            adjust_column_width(writer, '赛卓-预测', df_pred)
-        else:
-            st.warning("未上传预测文件，跳过添加 赛卓-预测 sheet")
+            # 安全库存 sheet
+            if safety_file:
+                df_safety = pd.read_excel(safety_file)
+                df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
+                adjust_column_width(writer, '赛卓-安全库存', df_safety)
+            else:
+                st.warning("未上传安全库存文件，跳过添加 赛卓-安全库存 sheet")
 
-        # 写入新旧料号 sheet
-        if mapping_file:
-            df_mapping = pd.read_excel(mapping_file)
-            df_mapping = preprocess_mapping_file(df_mapping)  # 预处理列名
-            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False)
-            adjust_column_width(writer, '赛卓-新旧料号', df_mapping)
-        else:
-            st.warning("未上传新旧料号文件，跳过添加 赛卓-新旧料号 sheet")
+            # 预测文件 sheet
+            if pred_file:
+                df_pred = pd.read_excel(pred_file)
+                df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
+                adjust_column_width(writer, '赛卓-预测', df_pred)
+            else:
+                st.warning("未上传预测文件，跳过添加 赛卓-预测 sheet")
 
-    # 添加下载按钮
-    with open(CONFIG['output_file'], 'rb') as f:
-        st.download_button('下载汇总报告', f, CONFIG['output_file'])
+            # 新旧料号 sheet
+            if mapping_file:
+                df_mapping = pd.read_excel(mapping_file)
+                df_mapping = preprocess_mapping_file(df_mapping)
+                df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False)
+                adjust_column_width(writer, '赛卓-新旧料号', df_mapping)
+            else:
+                st.warning("未上传新旧料号文件，跳过添加 赛卓-新旧料号 sheet")
+
+        with open(CONFIG['output_file'], 'rb') as f:
+            st.download_button('下载汇总报告', f, CONFIG['output_file'])
+
 
 if __name__ == '__main__':
     main()
