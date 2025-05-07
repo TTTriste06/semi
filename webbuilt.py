@@ -79,7 +79,14 @@ def upload_to_github(file, path_in_repo, commit_message):
         st.success(f"{path_in_repo} 上传成功！")
     else:
         st.error(f"上传失败: {response.json()}")
-        
+
+def preprocess_mapping_file(df):
+    # 只取前6列
+    df = df.iloc[:, :6]
+    # 重命名列
+    df.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名']
+    return df
+
 def download_mapping_from_github(path_in_repo):
     api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{path_in_repo}"
     response = requests.get(api_url, headers={
@@ -87,12 +94,12 @@ def download_mapping_from_github(path_in_repo):
     })
     if response.status_code == 200:
         content = base64.b64decode(response.json()['content'])
-        df = pd.read_excel(pd.io.common.BytesIO(content), header = 1)
-        # 自动重命名列
+        df = pd.read_excel(pd.io.common.BytesIO(content))
         if df.shape[1] >= 6:
-            df.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名']
+            df = preprocess_mapping_file(df)
         else:
-            st.warning("mapping_file.xlsx 列数不足，请检查文件格式")
+            st.warning(f"mapping_file.xlsx 列数不足：只发现 {df.shape[1]} 列，需要至少 6 列")
+            df = pd.DataFrame(columns=['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名'])
         return df
     else:
         st.warning("GitHub 上找不到 mapping_file.xlsx，用默认表或请先上传")
