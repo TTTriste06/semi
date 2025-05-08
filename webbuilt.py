@@ -274,17 +274,16 @@ def main():
                 worksheet['E2'].alignment = Alignment(horizontal='center', vertical='center')
             
                 # 自动调整列宽
-                for col in worksheet.columns:
-                    max_length = 0
-                    col_letter = col[0].column_letter  # 获取列字母
-                    for cell in col:
-                        try:
-                            if cell.value:
-                                max_length = max(max_length, len(str(cell.value)))
-                        except:
-                            pass
-                    adjusted_width = max_length + 4  # 可以根据需要调整这个偏移量
-                    worksheet.column_dimensions[col_letter].width = adjusted_width
+                for idx, col in enumerate(worksheet.columns, 1):
+                col_letter = get_column_letter(idx)  # 用 index 转字母
+                max_length = 0
+                for cell in col:
+                    try:
+                        if cell.value:
+                            max_length = max(max_length, len(str(cell.value)))
+                    except:
+                        pass
+                worksheet.column_dimensions[col_letter].width = max_length + 2  # +2 预留余量
                             
 
     
