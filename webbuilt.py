@@ -307,6 +307,16 @@ def main():
 
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
+                st.write("✅ unfulfilled_orders_summary（未交订单汇总）非空，行数：", len(unfulfilled_orders_summary))
+            else:
+                st.warning("⚠️ unfulfilled_orders_summary 是空的，没有未交订单汇总数据。")
+            
+            if not df_safety.empty:
+                st.write("✅ df_safety（安全库存表）非空，行数：", len(df_safety))
+            else:
+                st.warning("⚠️ df_safety 是空的，没有安全库存数据。")
+            
+            if not unfulfilled_orders_summary.empty and not df_safety.empty:
                 # 重命名安全库存列
                 df_safety_renamed = df_safety.rename(columns={
                     'WaferID': '晶圆品名',
@@ -335,15 +345,20 @@ def main():
                 st.write("匹配统计：")
                 st.write(merged_df['_merge'].value_counts())
             
-                # 显示没有匹配成功的行（最多前10行）
-                st.write("没有匹配上的样例（前10行）：")
-                st.write(merged_df[merged_df['_merge'] != 'both'].head(10))
+                # 显示没有匹配成功的样例
+                unmatched = merged_df[merged_df['_merge'] != 'both']
+                if not unmatched.empty:
+                    st.write("❌ 没有匹配上的样例（前10行）：")
+                    st.write(unmatched[['晶圆品名', '规格', '品名']].head(10))
+                else:
+                    st.write("🎉 全部成功匹配！")
             
                 # 去掉 indicator 列
                 merged_df.drop(columns=['_merge'], inplace=True)
             
                 # 更新汇总 DataFrame
                 unfulfilled_orders_summary = merged_df
+
 
                 
 
