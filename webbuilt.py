@@ -305,24 +305,6 @@ def main():
             df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False)
             adjust_column_width(writer, '赛卓-新旧料号', df_mapping)
 
-            # 合并安全库存的 InvWaf 和 InvPart 到汇总表
-            if not unfulfilled_orders_summary.empty and not df_safety.empty:
-                # 重命名安全库存列，对齐未交订单列名
-                rename_map = {'WaferID': '晶圆品名', 'OrderInformation': '规格', 'ProductionNO.': '品名'}
-                df_safety_renamed = df_safety.rename(columns=rename_map)
-            
-                # 只取需要的列
-                safety_cols = ['晶圆品名', '规格', '品名', 'InvWaf', 'InvPart']
-                safety_subset = df_safety_renamed[[col for col in safety_cols if col in df_safety_renamed.columns]].copy()
-            
-                # 合并到未交订单的前三列上
-                unfulfilled_orders_summary = unfulfilled_orders_summary.merge(
-                    safety_subset,
-                    how='left',
-                    on=['晶圆品名', '规格', '品名']
-                )
-
-
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
                 unfulfilled_orders_summary.to_excel(writer, sheet_name='汇总', index=False, startrow=1)
@@ -354,6 +336,63 @@ def main():
                         except:
                             pass
                     worksheet.column_dimensions[col_letter].width = max_length + 5
+
+            # 合并安全库存的 InvWaf 和 InvPart 到汇总表
+            if not unfulfilled_orders_summary.empty:
+                # 如果有安全库存文件，准备 InvWaf 和 InvPart 信息
+                if not df_safety.empty:
+                    # 重命名安全库存列
+                    df_safety_renamed = df_safety.rename(columns={
+                        'WaferID': '晶圆品名',
+                        'OrderInformation': '规格',
+                        'ProductionNO.': '品名'
+                    })
+            
+                    # 只保留需要的列
+                    df_safety_subset = df_safety_renamed[['晶圆品名', '规格', '品名', 'InvWaf', 'InvPart']]
+            
+                    # 按前3列做左连接，把 InvWaf 和 InvPart 补到汇总表
+                    unfulfilled_orders_summary = pd.merge(
+                        unfulfilled_orders_summary,
+                        df_safety_subset,
+                        on=['晶圆品名', '规格', '品名'],
+                        how='left'
+                    )
+                else:
+                    # 如果安全库存表是空的，补空列
+                    unfulfilled_orders_summary['InvWaf'] = None
+                    unfulfilled_orders_summary['InvPart'] = None
+            
+                # 写入 Excel，从第2行开始（第1行空出来）
+                unfulfilled_orders_summary.to_excel(writer, sheet_name='汇总', index=False, startrow=1)
+                adjust_column_width(writer, '汇总', unfulfilled_orders_summary)
+            
+                worksheet = writer.book['汇总']
+            
+                # 合并 D1:E1（第4,5列的第一行）写“安全库存”
+                worksheet.merge_cells('D1:E1')
+                worksheet['D1'] = '安全库存'
+                worksheet['D1'].alignment = Alignment(horizontal='center', vertical='center')
+            
+                # 第二行 D 列、E 列写标题
+                worksheet['D2'] = 'InvWaf（片）'
+                worksheet['D2'].alignment = Alignment(horizontal='center', vertical='center')
+                worksheet['E2'] = 'InvPart'
+                worksheet['E2'].alignment = Alignment(horizontal='center', vertical='center')
+            
+                # 自动调整列宽
+                for idx, col in enumerate(worksheet.columns, 1):
+                    col_letter = get_column_letter(idx)
+                    max_length = 0
+                    for cell in col:
+                        try:
+                            if cell.value:
+                                cell_len = sum(2 if ord(char) > 127 else 1 for char in str(cell.value))
+                                max_length = max(max_length, cell_len)
+                        except:
+                            pass
+                    worksheet.column_dimensions[col_letter].width = max_length + 5
+
 
         # 下载按钮
         with open(CONFIG['output_file'], 'rb') as f:
