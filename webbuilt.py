@@ -316,8 +316,12 @@ def main():
                         'ProductionNO.': '品名'
                     })
             
-                    # 只保留需要的列
-                    df_safety_subset = df_safety_renamed[['晶圆品名', '规格', '品名', 'InvWaf', 'InvPart']]
+                    # 保留需要的列并统一为字符串 + 去空格
+                    df_safety_subset = df_safety_renamed[['晶圆品名', '规格', '品名', 'InvWaf', 'InvPart']].copy()
+                    df_safety_subset[['晶圆品名', '规格', '品名']] = df_safety_subset[['晶圆品名', '规格', '品名']].astype(str).apply(lambda x: x.str.strip())
+            
+                    # 也处理 unfulfilled_orders_summary
+                    unfulfilled_orders_summary[['晶圆品名', '规格', '品名']] = unfulfilled_orders_summary[['晶圆品名', '规格', '品名']].astype(str).apply(lambda x: x.str.strip())
             
                     # 按前3列做左连接，把 InvWaf 和 InvPart 补到汇总表
                     unfulfilled_orders_summary = pd.merge(
@@ -330,6 +334,7 @@ def main():
                     # 如果安全库存表是空的，补空列
                     unfulfilled_orders_summary['InvWaf'] = None
                     unfulfilled_orders_summary['InvPart'] = None
+
             
                 # 写入 Excel，从第2行开始（第1行空出来）
                 unfulfilled_orders_summary.to_excel(writer, sheet_name='汇总', index=False, startrow=1)
