@@ -5,6 +5,8 @@ import requests
 import base64
 from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
+from openpyxl.styles import Alignment
+
 
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
 REPO_NAME = "TTTriste06/semi"
