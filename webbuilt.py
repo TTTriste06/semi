@@ -255,8 +255,19 @@ def main():
     
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
-                unfulfilled_orders_summary.to_excel(writer, sheet_name='汇总', index=False)
+                unfulfilled_orders_summary.to_excel(writer, sheet_name='汇总', index=False, startrow=1)
                 adjust_column_width(writer, '汇总', unfulfilled_orders_summary)
+                
+                # 合并 D1:E1（即第4,5列的第一行）并写入 "安全库存"
+                worksheet.merge_cells('D1:E1')
+                worksheet['D1'] = '安全库存'
+                
+                # 设置 D2, E2 的标题
+                worksheet['D2'] = 'InvWaf（片）'
+                worksheet['E2'] = 'InvPart'
+                
+                adjust_column_width(writer, '汇总', df_safety)
+
     
         # 下载按钮
         with open(CONFIG['output_file'], 'rb') as f:
