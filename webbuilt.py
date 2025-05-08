@@ -281,6 +281,7 @@ def main():
                 if filename == "赛卓-未交订单.xlsx":
                     cols_to_copy = [col for col in pivoted.columns if col in ["晶圆品名", "规格", "品名"]]
                     unfulfilled_orders_summary = pivoted[cols_to_copy].drop_duplicates()
+                    pending_pivoted = pivoted.copy()
 
             # 写入安全库存 sheet
             if safety_file:
@@ -385,56 +386,39 @@ def main():
                             safety_sheet.cell(row=row_idx, column=col).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
                 ###未交订单
-                # 1. 找到未交订单相关列
-                pending_cols = [col for col in pivoted.columns if col.startswith('未交订单数量_')]
+                if pending_pivoted is not None:
+                    # 找出历史未交订单和未来每月未交订单列
+                    pending_cols = [col for col in pending_pivoted.columns if '未交订单数量_' in col]
+                    if '历史未交订单数量' in pending_pivoted.columns:
+                        all_pending_cols = ['历史未交订单数量'] + pending_cols
+                    else:
+                        pending_pivoted['历史未交订单数量'] = 0
+                        all_pending_cols = ['历史未交订单数量'] + pending_cols
                 
-                # 2. 分历史和未来列
-                history_cols = []
-                future_cols = []
-                if CONFIG['selected_month']:
-                    for col in pending_cols:
-                        col_month = col.split('_')[-1]
-                        if col_month < CONFIG['selected_month']:
-                            history_cols.append(col)
-                        else:
-                            future_cols.append(col)
-                else:
-                    future_cols = pending_cols  # 没有指定月份，全当未来
-            
-                # 3. 计算历史未交订单数量
-                if history_cols:
-                    pivoted['历史未交订单数量'] = pivoted[history_cols].sum(axis=1)
-                else:
-                    pivoted['历史未交订单数量'] = 0
-            
-                # 4. 计算总未交订单数量（历史 + 未来）
-                pivoted['总未交订单'] = pivoted[['历史未交订单数量'] + future_cols].sum(axis=1)
-            
-                # 5. 按指定顺序整理列
-                order_cols = ['总未交订单', '历史未交订单数量'] + future_cols
-                final_cols = [col for col in ['晶圆品名', '规格', '品名'] if col in pivoted.columns] + order_cols
-                final_df = pivoted[final_cols]
-            
-                # 6. 写入 Excel，第3行开始
-                final_df.to_excel(writer, sheet_name='汇总', index=False, startrow=2)
-            
-                # 7. 写入标题行（第2行）和合并单元格（第1行）
-                worksheet = writer.book['汇总']
-                start_col = len(final_cols) - len(order_cols) + 1  # Excel列从1开始
-                end_col = len(final_cols)
-                start_letter = get_column_letter(start_col)
-                end_letter = get_column_letter(end_col)
-                worksheet.merge_cells(f'{start_letter}1:{end_letter}1')
-                worksheet[f'{start_letter}1'] = '未交订单'
-                worksheet[f'{start_letter}1'].alignment = Alignment(horizontal='center', vertical='center')
-            
-                for idx, col_name in enumerate(order_cols, start=start_col):
-                    cell = worksheet.cell(row=2, column=idx)
-                    cell.value = col_name
-                    cell.alignment = Alignment(horizontal='center', vertical='center')
-            
-                # 8. 自动调整列宽
-                adjust_column_width(writer, '汇总', final_df)
+                    # 计算总和
+                    pending_pivoted['总未交订单'] = pending_pivoted[all_pending_cols].sum(axis=1)
+                
+                    # 整理顺序
+                    pending_summary_cols = ['总未交订单'] + all_pending_cols
+                    pending_summary_df = pending_pivoted[['晶圆品名', '规格', '品名'] + pending_summary_cols]
+                
+                    # 定位汇总 sheet
+                    summary_sheet = writer.sheets['汇总']
+                    start_col = unfulfilled_orders_summary.shape[1] + 1  # 起始列号（Excel从1开始）
+                    end_col = start_col + len(pending_summary_cols) - 1
+                
+                    # 合并第一行
+                    summary_sheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
+                    summary_sheet.cell(row=1, column=start_col, value='未交订单').alignment = Alignment(horizontal='center', vertical='center')
+                
+                    # 写入第二行标题
+                    for idx, col in enumerate(pending_summary_cols, start=start_col):
+                        summary_sheet.cell(row=2, column=idx, value=col).alignment = Alignment(horizontal='center', vertical='center')
+                
+                    # 写入第三行及以后数据（只写汇总部分，不写前三列）
+                    for row_idx, row in enumerate(pending_summary_df[pending_summary_cols].itertuples(index=False), start=3):
+                        for col_idx, value in enumerate(row, start=start_col):
+                            summary_sheet.cell(row=row_idx, column=col_idx, value=value)
 
 
 
