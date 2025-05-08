@@ -253,34 +253,34 @@ def main():
     if mapping_file:
         upload_to_github(mapping_file, "mapping_file.xlsx", "上传新旧料号文件")
 
-
     if st.button('提交并生成报告') and uploaded_files:
         with pd.ExcelWriter(CONFIG['output_file'], engine='openpyxl') as writer:
             # 用于存储未交订单的前三列数据
             unfulfilled_orders_summary = pd.DataFrame()
-    
+            df_safety = pd.DataFrame()
+
             for f in uploaded_files:
                 filename = f.name
                 if filename not in CONFIG['pivot_config']:
                     st.warning(f"跳过未配置的文件: {filename}")
                     continue
-    
+
                 df = pd.read_excel(f)
                 config = CONFIG['pivot_config'][filename]
-    
+
                 if 'date_format' in config and config['columns'] in df.columns:
                     df = process_date_column(df, config['columns'], config['date_format'])
-    
-                pivoted = create_pivot(df, config, filename)
+
+                pivoted = create_pivot(df, config, filename, mapping_df)
                 sheet_name = filename[:30].rstrip('.xlsx')
                 pivoted.to_excel(writer, sheet_name=sheet_name, index=False)
                 adjust_column_width(writer, sheet_name, pivoted)
-    
+
                 # 保存未交订单的前三列（去重）
                 if filename == "赛卓-未交订单.xlsx":
                     cols_to_copy = [col for col in pivoted.columns if col in ["晶圆品名", "规格", "品名"]]
                     unfulfilled_orders_summary = pivoted[cols_to_copy].drop_duplicates()
-    
+
             # 写入安全库存 sheet
             if safety_file:
                 df_safety = pd.read_excel(safety_file)
@@ -288,7 +288,7 @@ def main():
                 df_safety = download_backup_file("safety_file.xlsx")
             df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
             adjust_column_width(writer, '赛卓-安全库存', df_safety)
-            
+
             # 写入预测文件 sheet
             if pred_file:
                 df_pred = pd.read_excel(pred_file)
@@ -296,7 +296,7 @@ def main():
                 df_pred = download_backup_file("pred_file.xlsx")
             df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
             adjust_column_width(writer, '赛卓-预测', df_pred)
-            
+
             # 写入新旧料号文件 sheet
             if mapping_file:
                 df_mapping = pd.read_excel(mapping_file)
@@ -305,25 +305,34 @@ def main():
             df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False)
             adjust_column_width(writer, '赛卓-新旧料号', df_mapping)
 
-    
+            # === 合并安全库存的 InvWaf 和 InvPart 到汇总表 ===
+            if not unfulfilled_orders_summary.empty and not df_safety.empty:
+                safety_cols = ['晶圆品名', '规格', '品名', 'InvWaf', 'InvPart']
+                safety_subset = df_safety[[col for col in safety_cols if col in df_safety.columns]].copy()
+                unfulfilled_orders_summary = unfulfilled_orders_summary.merge(
+                    safety_subset,
+                    how='left',
+                    on=['晶圆品名', '规格', '品名']
+                )
+
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
                 unfulfilled_orders_summary.to_excel(writer, sheet_name='汇总', index=False, startrow=1)
                 adjust_column_width(writer, '汇总', unfulfilled_orders_summary)
 
                 worksheet = writer.book['汇总']
-                
+
                 # 合并 D1:E1（第4,5列的第一行）并写入 "安全库存"
                 worksheet.merge_cells('D1:E1')
                 worksheet['D1'] = '安全库存'
                 worksheet['D1'].alignment = Alignment(horizontal='center', vertical='center')
-            
+
                 # 设置 D2, E2 的标题
                 worksheet['D2'] = 'InvWaf（片）'
                 worksheet['D2'].alignment = Alignment(horizontal='center', vertical='center')
                 worksheet['E2'] = 'InvPart'
                 worksheet['E2'].alignment = Alignment(horizontal='center', vertical='center')
-            
+
                 # 自动调整列宽
                 for idx, col in enumerate(worksheet.columns, 1):
                     col_letter = get_column_letter(idx)
@@ -331,20 +340,17 @@ def main():
                     for cell in col:
                         try:
                             if cell.value:
-                                cell_len = len(str(cell.value))
-                                # 中文字符按1.5倍宽度处理
-                                cell_len = sum(2 if ord(char) > 127 else 1 for char in str(cell.value))
+                                s = str(cell.value)
+                                cell_len = sum(2 if ord(char) > 127 else 1 for char in s)
                                 max_length = max(max_length, cell_len)
                         except:
                             pass
-                    worksheet.column_dimensions[col_letter].width = max_length + 5  # 留余量
+                    worksheet.column_dimensions[col_letter].width = max_length + 5
 
-                                
-
-    
         # 下载按钮
         with open(CONFIG['output_file'], 'rb') as f:
             st.download_button('下载汇总报告', f, CONFIG['output_file'])
+
 
 
 if __name__ == '__main__':
