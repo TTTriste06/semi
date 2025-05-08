@@ -113,12 +113,16 @@ def download_backup_file(file_name):
     response = requests.get(url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
     
     if response.status_code == 200:
-        # 检查是否是 Excel 文件（推荐）
         content_type = response.headers.get("Content-Type", "")
+        # 检查内容类型
         if "application/vnd.openxmlformats-officedocument" in content_type or file_name.endswith(".xlsx"):
-            return pd.read_excel(BytesIO(response.content))
+            try:
+                return pd.read_excel(BytesIO(response.content))
+            except Exception as e:
+                st.warning(f"{file_name} 下载成功，但解析 Excel 出错：{e}，将创建空 sheet。")
+                return pd.DataFrame()
         else:
-            st.warning(f"{file_name} 下载成功，但不是有效的 Excel 文件，将创建空 sheet。")
+            st.warning(f"{file_name} 下载成功，但不是 Excel 文件，将创建空 sheet。")
             return pd.DataFrame()
     else:
         st.warning(f"无法下载 {file_name}（状态码：{response.status_code}），将创建空 sheet。")
