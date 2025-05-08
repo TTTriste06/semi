@@ -526,6 +526,66 @@ def main():
                                 for col_idx in range(1, len(product_inventory_pivoted.columns) + 1):
                                     inventory_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
+                ###成品在制
+                # === 确保成品在制 DataFrame 已生成 ===
+                product_wip_pivoted = None
+                for f in uploaded_files:
+                    if f.name == "赛卓-成品在制.xlsx":
+                        df_product_wip = pd.read_excel(f)
+                        config_wip = CONFIG['pivot_config']['赛卓-成品在制.xlsx']
+                        if 'date_format' in config_wip and config_wip['columns'] in df_product_wip.columns:
+                            df_product_wip = process_date_column(df_product_wip, config_wip['columns'], config_wip['date_format'])
+                        product_wip_pivoted = create_pivot(df_product_wip, config_wip, f.name, mapping_df)
+                        break
+                
+                if product_wip_pivoted is not None:
+                    pending_cols = [col for col in product_wip_pivoted.columns if '未交' in col]
+                
+                    summary_sheet = writer.sheets['汇总']
+                    start_col = summary_sheet.max_column + 1
+                
+                    # 合并第一行
+                    summary_sheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=start_col + 1)
+                    summary_sheet.cell(row=1, column=start_col, value='成品在制').alignment = Alignment(horizontal='center', vertical='center')
+                    summary_sheet.cell(row=2, column=start_col, value='成品').alignment = Alignment(horizontal='center', vertical='center')
+                    summary_sheet.cell(row=2, column=start_col + 1, value='半成品').alignment = Alignment(horizontal='center', vertical='center')
+                
+                    # 遍历汇总 sheet 每行
+                    for row_idx in range(3, summary_sheet.max_row + 1):
+                        summary_wf = summary_sheet.cell(row=row_idx, column=1).value
+                        summary_spec = summary_sheet.cell(row=row_idx, column=2).value
+                        summary_prod = summary_sheet.cell(row=row_idx, column=3).value
+                
+                        # --- 查成品 ---
+                        match = product_wip_pivoted[
+                            (product_wip_pivoted['晶圆型号'].astype(str) == str(summary_wf)) &
+                            (product_wip_pivoted['产品规格'].astype(str) == str(summary_spec)) &
+                            (product_wip_pivoted['产品品名'].astype(str) == str(summary_prod))
+                        ]
+                        sum_finished = match[pending_cols].sum(axis=1).sum() if not match.empty else 0
+                        summary_sheet.cell(row=row_idx, column=start_col, value=sum_finished)
+                
+                        # --- 查半成品 ---
+                        half_prod_name = None
+                        map_match = mapping_df[
+                            (mapping_df['旧晶圆品名'].astype(str) == str(summary_wf)) &
+                            (mapping_df['旧规格'].astype(str) == str(summary_spec)) &
+                            (mapping_df['旧品名'].astype(str) == str(summary_prod))
+                        ]
+                        if not map_match.empty and not pd.isna(map_match['新晶圆品名'].values[0]):
+                            half_prod_name = map_match['新晶圆品名'].values[0]
+                
+                        sum_half = 0
+                        if half_prod_name:
+                            half_match = product_wip_pivoted[
+                                (product_wip_pivoted['晶圆型号'].astype(str) == str(summary_wf)) &
+                                (product_wip_pivoted['产品规格'].astype(str) == str(summary_spec)) &
+                                (product_wip_pivoted['产品品名'].astype(str) == str(half_prod_name))
+                            ]
+                            sum_half = half_match[pending_cols].sum(axis=1).sum() if not half_match.empty else 0
+                
+                        summary_sheet.cell(row=row_idx, column=start_col + 1, value=sum_half)
+                
 
                 # 自动调整列宽
                 for idx, col in enumerate(worksheet.columns, 1):
