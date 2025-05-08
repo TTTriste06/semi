@@ -307,33 +307,45 @@ def main():
 
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
-                # 如果有安全库存文件，准备 InvWaf 和 InvPart 信息
-                if not df_safety.empty:
-                    # 重命名安全库存列
-                    df_safety_renamed = df_safety.rename(columns={
-                        'WaferID': '晶圆品名',
-                        'OrderInformation': '规格',
-                        'ProductionNO.': '品名'
-                    })
+                # 重命名安全库存列
+                df_safety_renamed = df_safety.rename(columns={
+                    'WaferID': '晶圆品名',
+                    'OrderInformation': '规格',
+                    'ProductionNO.': '品名'
+                })
             
-                    # 保留需要的列并统一为字符串 + 去空格
-                    df_safety_subset = df_safety_renamed[['晶圆品名', '规格', '品名', 'InvWaf', 'InvPart']].copy()
-                    df_safety_subset[['晶圆品名', '规格', '品名']] = df_safety_subset[['晶圆品名', '规格', '品名']].astype(str).apply(lambda x: x.str.strip())
+                # 统一列为字符串、去空格
+                for col in ['晶圆品名', '规格', '品名']:
+                    df_safety_renamed[col] = df_safety_renamed[col].astype(str).str.strip()
+                    unfulfilled_orders_summary[col] = unfulfilled_orders_summary[col].astype(str).str.strip()
             
-                    # 也处理 unfulfilled_orders_summary
-                    unfulfilled_orders_summary[['晶圆品名', '规格', '品名']] = unfulfilled_orders_summary[['晶圆品名', '规格', '品名']].astype(str).apply(lambda x: x.str.strip())
+                # 保留需要的列
+                df_safety_subset = df_safety_renamed[['晶圆品名', '规格', '品名', 'InvWaf', 'InvPart']].copy()
             
-                    # 按前3列做左连接，把 InvWaf 和 InvPart 补到汇总表
-                    unfulfilled_orders_summary = pd.merge(
-                        unfulfilled_orders_summary,
-                        df_safety_subset,
-                        on=['晶圆品名', '规格', '品名'],
-                        how='left'
-                    )
-                else:
-                    # 如果安全库存表是空的，补空列
-                    unfulfilled_orders_summary['InvWaf'] = None
-                    unfulfilled_orders_summary['InvPart'] = None
+                # 合并 + 带 indicator
+                merged_df = pd.merge(
+                    unfulfilled_orders_summary,
+                    df_safety_subset,
+                    on=['晶圆品名', '规格', '品名'],
+                    how='left',
+                    indicator=True
+                )
+            
+                # 显示匹配情况统计
+                st.write("匹配统计：")
+                st.write(merged_df['_merge'].value_counts())
+            
+                # 显示没有匹配成功的行（最多前10行）
+                st.write("没有匹配上的样例（前10行）：")
+                st.write(merged_df[merged_df['_merge'] != 'both'].head(10))
+            
+                # 去掉 indicator 列
+                merged_df.drop(columns=['_merge'], inplace=True)
+            
+                # 更新汇总 DataFrame
+                unfulfilled_orders_summary = merged_df
+
+                
 
             
                 # 写入 Excel，从第2行开始（第1行空出来）
