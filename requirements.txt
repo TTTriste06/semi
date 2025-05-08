@@ -2,3 +2,8 @@ streamlit
 pandas
 openpyxl
 requests
+os
+base64
+hashlib
+io
+datetime
