@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import base64
+from io import BytesIO
 from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment
@@ -110,12 +111,19 @@ def download_mapping_from_github(path_in_repo):
 def download_backup_file(file_name):
     url = f"https://raw.githubusercontent.com/{REPO_NAME}/{BRANCH}/{file_name}"
     response = requests.get(url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
+    
     if response.status_code == 200:
-        from io import BytesIO
-        return pd.read_excel(BytesIO(response.content))
+        # 检查是否是 Excel 文件（推荐）
+        content_type = response.headers.get("Content-Type", "")
+        if "application/vnd.openxmlformats-officedocument" in content_type or file_name.endswith(".xlsx"):
+            return pd.read_excel(BytesIO(response.content))
+        else:
+            st.warning(f"{file_name} 下载成功，但不是有效的 Excel 文件，将创建空 sheet。")
+            return pd.DataFrame()
     else:
-        st.warning(f"无法下载 {file_name}，创建空 sheet")
+        st.warning(f"无法下载 {file_name}（状态码：{response.status_code}），将创建空 sheet。")
         return pd.DataFrame()
+
         
 def process_date_column(df, date_col, date_format):
     if pd.api.types.is_numeric_dtype(df[date_col]):
