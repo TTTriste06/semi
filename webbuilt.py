@@ -314,7 +314,7 @@ def main():
 
                 worksheet = writer.book['汇总']
                 
-                worksheet = writer.book['汇总']
+                ###安全库存
             
                 # 合并 D1:E1（第4,5列的第一行）写“安全库存”
                 worksheet.merge_cells('D1:E1')
@@ -340,51 +340,51 @@ def main():
                             pass
                     worksheet.column_dimensions[col_letter].width = max_length + 5
 
-            # 重命名安全库存列方便匹配
-            df_safety.rename(columns={
-                'WaferID': '晶圆品名',
-                'OrderInformation': '规格',
-                'ProductionNO.': '品名'
-            }, inplace=True)
-            
-            # 做一个标志列，表示是否被使用
-            df_safety['已匹配'] = False
-            
-            # 合并安全库存数据到汇总 sheet（unfulfilled_orders_summary）
-            summary_with_safety = unfulfilled_orders_summary.merge(
-                df_safety[['晶圆品名', '规格', '品名', ' InvWaf', ' InvPart']],
-                on=['晶圆品名', '规格', '品名'], 
-                how='left'
-            )
-            
-            #更新已匹配标志
-            matched_mask = df_safety.set_index(['晶圆品名', '规格', '品名']).index.isin(
-                summary_with_safety.dropna(subset=[' InvWaf', ' InvPart']).set_index(['晶圆品名', '规格', '品名']).index
-            )
-            df_safety.loc[matched_mask, '已匹配'] = True
-            
-            #写入汇总 sheet
-            summary_with_safety.rename(columns={' InvWaf': 'InvWaf（片）', ' InvPart': 'InvPart'}, inplace=True)
-            summary_with_safety.to_excel(writer, sheet_name='汇总', index=False, startrow=1)
-            adjust_column_width(writer, '汇总', summary_with_safety)
-            
-            # 合并 D1:E1 写入表头
-            worksheet = writer.book['汇总']
-            worksheet.merge_cells('D1:E1')
-            worksheet['D1'] = '安全库存'
-            worksheet['D1'].alignment = Alignment(horizontal='center', vertical='center')
-            worksheet['D2'] = 'InvWaf（片）'
-            worksheet['D2'].alignment = Alignment(horizontal='center', vertical='center')
-            worksheet['E2'] = 'InvPart'
-            worksheet['E2'].alignment = Alignment(horizontal='center', vertical='center')
-            
-            # 标红未被使用的安全库存行
-            safety_sheet = writer.book['赛卓-安全库存']
-            for row_idx, used in enumerate(df_safety['已匹配'], start=2):  # Excel 从 1 开始，header 是第1行
-                if not used:
-                    for col in range(1, len(df_safety.columns) + 1):
-                        safety_sheet.cell(row=row_idx, column=col).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-
+                # 重命名安全库存列方便匹配
+                df_safety.rename(columns={
+                    'WaferID': '晶圆品名',
+                    'OrderInformation': '规格',
+                    'ProductionNO.': '品名'
+                }, inplace=True)
+                
+                # 做一个标志列，表示是否被使用
+                df_safety['已匹配'] = False
+                
+                # 合并安全库存数据到汇总 sheet（unfulfilled_orders_summary）
+                summary_with_safety = unfulfilled_orders_summary.merge(
+                    df_safety[['晶圆品名', '规格', '品名', ' InvWaf', ' InvPart']],
+                    on=['晶圆品名', '规格', '品名'], 
+                    how='left'
+                )
+                
+                #更新已匹配标志
+                matched_mask = df_safety.set_index(['晶圆品名', '规格', '品名']).index.isin(
+                    summary_with_safety.dropna(subset=[' InvWaf', ' InvPart']).set_index(['晶圆品名', '规格', '品名']).index
+                )
+                df_safety.loc[matched_mask, '已匹配'] = True
+                
+                #写入汇总 sheet
+                summary_with_safety.rename(columns={' InvWaf': 'InvWaf（片）', ' InvPart': 'InvPart'}, inplace=True)
+                summary_with_safety.to_excel(writer, sheet_name='汇总', index=False, startrow=1)
+                adjust_column_width(writer, '汇总', summary_with_safety)
+                
+                # 合并 D1:E1 写入表头
+                worksheet = writer.book['汇总']
+                worksheet.merge_cells('D1:E1')
+                worksheet['D1'] = '安全库存'
+                worksheet['D1'].alignment = Alignment(horizontal='center', vertical='center')
+                worksheet['D2'] = 'InvWaf（片）'
+                worksheet['D2'].alignment = Alignment(horizontal='center', vertical='center')
+                worksheet['E2'] = 'InvPart'
+                worksheet['E2'].alignment = Alignment(horizontal='center', vertical='center')
+                
+                # 标红未被使用的安全库存行
+                safety_sheet = writer.book['赛卓-安全库存']
+                for row_idx, used in enumerate(df_safety['已匹配'], start=2):  # Excel 从 1 开始，header 是第1行
+                    if not used:
+                        for col in range(1, len(df_safety.columns) + 1):
+                            safety_sheet.cell(row=row_idx, column=col).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+        
 
 
         # 下载按钮
