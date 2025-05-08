@@ -531,101 +531,68 @@ def main():
                                 for col_idx in range(1, len(product_inventory_pivoted.columns) + 1):
                                     inventory_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
-                ###成品在制
-                # === 处理成品在制、半成品 ===
-                product_wip_pivoted = None
 
+
+
+                ###成品在制
+                # === 成品在制 ===
+                product_in_progress_df = None
                 for f in uploaded_files:
-                    filename = f.name
-                    df = pd.read_excel(f)
-                    if filename == '赛卓-成品在制.xlsx':
-                        config_wip = CONFIG['pivot_config'][filename]
-                        if 'date_format' in config_wip and config_wip['columns'] in df.columns:
-                            df = process_date_column(df, config_wip['columns'], config_wip['date_format'])
-                        product_wip_pivoted = create_pivot(df, config_wip, filename, mapping_df)
-                        product_wip_pivoted.to_excel(writer, sheet_name='赛卓-成品在制', index=False)
-                    elif filename == '赛卓-未交订单.xlsx':
-                        config = CONFIG['pivot_config'][filename]
-                        df = process_date_column(df, config['columns'], config['date_format'])
-                        pivoted = create_pivot(df, config, filename, mapping_df)
-                        unfulfilled_orders_summary = pivoted[['晶圆品名', '规格', '品名']].drop_duplicates()
-                        pivoted.to_excel(writer, sheet_name='赛卓-未交订单', index=False)
-                    else:
-                        config = CONFIG['pivot_config'][filename]
-                        pivoted = create_pivot(df, config, filename, mapping_df)
-                        pivoted.to_excel(writer, sheet_name=filename.rstrip('.xlsx'), index=False)
-    
-                # 写入汇总 sheet
-                unfulfilled_orders_summary.to_excel(writer, sheet_name='汇总', index=False, startrow=1)
-                summary_sheet = writer.book['汇总']
-    
-                # === 处理成品在制、半成品 ===
-                if product_wip_pivoted is not None:
-                    pending_cols = [col for col in product_wip_pivoted.columns if '未交' in col]
+                    if f.name == "赛卓-成品在制.xlsx":
+                        df_product_in_progress = pd.read_excel(f)
+                        config_in_progress = CONFIG['pivot_config']['赛卓-成品在制.xlsx']
+                        if 'date_format' in config_in_progress and config_in_progress['columns'] in df_product_in_progress.columns:
+                            df_product_in_progress = process_date_column(df_product_in_progress, config_in_progress['columns'], config_in_progress['date_format'])
+                        product_in_progress_df = create_pivot(df_product_in_progress, config_in_progress, f.name, mapping_df)
+                        break
+                
+                if product_in_progress_df is not None:
+                    # 直接成品
+                    required_columns = ['晶圆型号', '产品规格', '产品品名']
+                    month_cols = [col for col in product_in_progress_df.columns if col.startswith('未交_')]
+                    
+                    summary_sheet = writer.sheets['汇总']
                     start_col = summary_sheet.max_column + 1
-    
-                    # 添加汇总表标题
-                    summary_sheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=start_col + 1)
+                    
+                    # 写表头
+                    summary_sheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=start_col+1)
                     summary_sheet.cell(row=1, column=start_col, value='成品在制').alignment = Alignment(horizontal='center', vertical='center')
                     summary_sheet.cell(row=2, column=start_col, value='成品').alignment = Alignment(horizontal='center', vertical='center')
-                    summary_sheet.cell(row=2, column=start_col + 1, value='半成品').alignment = Alignment(horizontal='center', vertical='center')
-    
-                    # 初始化成品在制表的已匹配标志
-                    product_wip_pivoted['已匹配'] = False
-    
-                    # 遍历汇总表每一行
+                    summary_sheet.cell(row=2, column=start_col+1, value='半成品').alignment = Alignment(horizontal='center', vertical='center')
+                    
                     for row_idx in range(3, summary_sheet.max_row + 1):
                         summary_wf = summary_sheet.cell(row=row_idx, column=1).value
                         summary_spec = summary_sheet.cell(row=row_idx, column=2).value
                         summary_prod = summary_sheet.cell(row=row_idx, column=3).value
-    
-                        # 查成品
-                        match = product_wip_pivoted[
-                            (product_wip_pivoted['晶圆型号'].astype(str) == str(summary_wf)) &
-                            (product_wip_pivoted['产品规格'].astype(str) == str(summary_spec)) &
-                            (product_wip_pivoted['产品品名'].astype(str) == str(summary_prod))
+                
+                        # 成品合计
+                        match = product_in_progress_df[
+                            (product_in_progress_df['晶圆型号'].astype(str) == str(summary_wf)) &
+                            (product_in_progress_df['产品规格'].astype(str) == str(summary_spec)) &
+                            (product_in_progress_df['产品品名'].astype(str) == str(summary_prod))
                         ]
-                        sum_finished = match[pending_cols].sum(axis=1).sum() if not match.empty else 0
-                        summary_sheet.cell(row=row_idx, column=start_col, value=sum_finished)
-                        if not match.empty:
-                            product_wip_pivoted.loc[match.index, '已匹配'] = True
-    
-                        # 查半成品名（mapping_df 用新晶圆、新规格、新品名匹配）
-                        half_prod_name = None
-                        if (
-                            mapping_df is not None and
-                            not mapping_df.empty and
-                            all(col in mapping_df.columns for col in ['新晶圆品名', '新规格', '新品名', '半成品'])
-                        ):
-                            map_match = mapping_df[
-                                (mapping_df['新晶圆品名'].astype(str) == str(summary_wf)) &
-                                (mapping_df['新规格'].astype(str) == str(summary_spec)) &
-                                (mapping_df['新品名'].astype(str) == str(summary_prod))
+                        prod_sum = match[month_cols].sum(axis=1).values[0] if not match.empty else 0
+                
+                        # 半成品替换品名
+                        semi_name = mapping_df[
+                            (mapping_df['新晶圆品名'].astype(str) == str(summary_wf)) &
+                            (mapping_df['新规格'].astype(str) == str(summary_spec)) &
+                            (mapping_df['新品名'].astype(str) == str(summary_prod))
+                        ]['半成品'].dropna()
+                        
+                        semi_sum = 0
+                        if not semi_name.empty:
+                            semi_prod_name = semi_name.values[0]
+                            match_semi = product_in_progress_df[
+                                (product_in_progress_df['晶圆型号'].astype(str) == str(summary_wf)) &
+                                (product_in_progress_df['产品规格'].astype(str) == str(summary_spec)) &
+                                (product_in_progress_df['产品品名'].astype(str) == str(semi_prod_name))
                             ]
-                            if not map_match.empty and not pd.isna(map_match['半成品'].values[0]):
-                                half_prod_name = map_match['半成品'].values[0]
-    
-                        # 查半成品
-                        sum_half = 0
-                        if half_prod_name:
-                            half_match = product_wip_pivoted[
-                                (product_wip_pivoted['晶圆型号'].astype(str) == str(summary_wf)) &
-                                (product_wip_pivoted['产品规格'].astype(str) == str(summary_spec)) &
-                                (product_wip_pivoted['产品品名'].astype(str) == str(half_prod_name))
-                            ]
-                            sum_half = half_match[pending_cols].sum(axis=1).sum() if not half_match.empty else 0
-                            if not half_match.empty:
-                                product_wip_pivoted.loc[half_match.index, '已匹配'] = True
-    
-                        summary_sheet.cell(row=row_idx, column=start_col + 1, value=sum_half)
-    
-                    # 标红未匹配行
-                    wip_sheet = writer.book['赛卓-成品在制']
-                    for row_idx, matched in enumerate(product_wip_pivoted['已匹配'], start=2):
-                        if not matched:
-                            for col_idx in range(1, len(product_wip_pivoted.columns) + 1):
-                                wip_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-                 
+                            semi_sum = match_semi[month_cols].sum(axis=1).values[0] if not match_semi.empty else 0
+                
+                        summary_sheet.cell(row=row_idx, column=start_col, value=prod_sum)
+                        summary_sheet.cell(row=row_idx, column=start_col + 1, value=semi_sum)
+
 
                 # 自动调整列宽
                 for idx, col in enumerate(worksheet.columns, 1):
