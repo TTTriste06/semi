@@ -409,56 +409,60 @@ def main():
                 ### 预测
                 # === 处理预测 sheet ===
                 if not df_pred.empty:
-                    # 确保第二行是 header
                     df_pred.columns = df_pred.iloc[0]
-                    df_pred = df_pred.drop([0, 0]).reset_index(drop=True)
-
-                    st.write("预测文件列名：", df_pred.columns.tolist())
+                    df_pred = df_pred.drop([0,0]).reset_index(drop=True)
                 
-                    # 添加匹配标志
-                    df_pred['已匹配'] = False
-                    df_pred['合计数量'] = None
-                    df_pred['合计金额'] = None
+                    # 检查列是否存在
+                    required_columns = ['晶圆品名', '产品型号', 'ProductionNO.', '合计数量', '合计金额']
+                    if all(col in df_pred.columns for col in required_columns):
+                        # 构造 key 进行匹配
+                        pred_key = df_pred[['晶圆品名', '产品型号', 'ProductionNO.']].astype(str)
+                        summary_key = unfulfilled_orders_summary[['晶圆品名', '规格', '品名']].astype(str)
                 
-                    # 构造 key 进行匹配
-                    pred_key = df_pred[['晶圆品名', '产品型号', 'ProductionNO.']].astype(str)
-                    summary_key = unfulfilled_orders_summary[['晶圆品名', '规格', '品名']].astype(str)
+                        # 在预测表中加匹配标志
+                        df_pred['已匹配'] = False
                 
-                    # 在预测表中逐行查找匹配行
-                    for idx, pred_row in pred_key.iterrows():
-                        match = ((summary_key['晶圆品名'] == pred_row['晶圆品名']) &
-                                 (summary_key['规格'] == pred_row['产品型号']) &
-                                 (summary_key['品名'] == pred_row['ProductionNO.']))
-                        if match.any():
-                            df_pred.at[idx, '已匹配'] = True
-                            # 这里可以填入合计数量和金额的值（示例用 100 和 200，换成你实际的计算）
-                            df_pred.at[idx, '合计数量'] = 100
-                            df_pred.at[idx, '合计金额'] = 200
+                        # 定位汇总 sheet
+                        summary_sheet = writer.sheets['汇总']
+                        start_col = summary_sheet.max_column + 1  # 空白列的起点
                 
-                    # 写入 Excel，保留 header
-                    df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False, startrow=1)
-                    adjust_column_width(writer, '赛卓-预测', df_pred)
+                        # 合并第一行单元格写入“预测”
+                        summary_sheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=start_col+1)
+                        summary_sheet.cell(row=1, column=start_col, value='预测').alignment = Alignment(horizontal='center', vertical='center')
+                        summary_sheet.cell(row=2, column=start_col, value='合计数量').alignment = Alignment(horizontal='center', vertical='center')
+                        summary_sheet.cell(row=2, column=start_col+1, value='合计金额').alignment = Alignment(horizontal='center', vertical='center')
                 
-                    pred_sheet = writer.book['赛卓-预测']
+                        # 遍历汇总 sheet 的数据行（从第3行开始）
+                        for row_idx in range(3, summary_sheet.max_row + 1):
+                            summary_wf = summary_sheet.cell(row=row_idx, column=1).value
+                            summary_spec = summary_sheet.cell(row=row_idx, column=2).value
+                            summary_prod = summary_sheet.cell(row=row_idx, column=3).value
                 
-                    # 合并第一行单元格并写入 “预测”
-                    pred_sheet.merge_cells('A1:B1')
-                    pred_sheet['A1'] = '预测'
-                    pred_sheet['A1'].alignment = Alignment(horizontal='center', vertical='center')
+                            # 查找预测表匹配行
+                            match = df_pred[
+                                (df_pred['晶圆品名'].astype(str) == str(summary_wf)) &
+                                (df_pred['产品型号'].astype(str) == str(summary_spec)) &
+                                (df_pred['ProductionNO.'].astype(str) == str(summary_prod))
+                            ]
                 
-                    # 写入第二行标题（确保列名在 A2 开始）
-                    pred_sheet['A2'] = '合计数量'
-                    pred_sheet['B2'] = '合计金额'
-                    pred_sheet['A2'].alignment = Alignment(horizontal='center', vertical='center')
-                    pred_sheet['B2'].alignment = Alignment(horizontal='center', vertical='center')
+                            if not match.empty:
+                                qty = match['合计数量'].values[0]
+                                amt = match['合计金额'].values[0]
+                                summary_sheet.cell(row=row_idx, column=start_col, value=qty)
+                                summary_sheet.cell(row=row_idx, column=start_col+1, value=amt)
                 
-                    # 标红未匹配的行（Excel 从 1 开始，且跳过 header，注意偏移）
-                    for row_idx, matched in enumerate(df_pred['已匹配'], start=3):  # 因为数据从第3行开始
-                        if not matched:
-                            for col_idx in range(1, len(df_pred.columns) + 1):
-                                pred_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-
-                    
+                                # 标记预测表的行
+                                df_pred.loc[match.index, '已匹配'] = True
+                
+                        # 在预测表中标红未匹配的行
+                        pred_sheet = writer.book['赛卓-预测']
+                        for row_idx, matched in enumerate(df_pred['已匹配'], start=3):  # 从第3行开始
+                            if not matched:
+                                for col_idx in range(1, len(df_pred.columns) + 1):
+                                    pred_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+                
+                        # 给汇总表前两行加黑框
+                        add_black_border(summary_sheet, 2, summary_sheet.max_column)
 
                 # 自动调整列宽
                 for idx, col in enumerate(worksheet.columns, 1):
