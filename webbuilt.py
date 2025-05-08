@@ -230,7 +230,7 @@ def main():
             pivoted.to_excel(writer, sheet_name=sheet_name, index=False)
             adjust_column_width(writer, sheet_name, pivoted)
 
-            # 保存未交订单的前三列（去重防止重复）
+            # 保存未交订单的前三列（去重）
             if filename == "赛卓-未交订单.xlsx":
                 cols_to_copy = [col for col in pivoted.columns if col in ["晶圆品名", "规格", "品名"]]
                 unfulfilled_orders_summary = pivoted[cols_to_copy].drop_duplicates()
