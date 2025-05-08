@@ -404,22 +404,23 @@ def main():
                 
                     # 定位汇总 sheet
                     summary_sheet = writer.sheets['汇总']
-                    start_col = unfulfilled_orders_summary.shape[1] + 1  # 起始列号（Excel从1开始）
+                    # ✅ 前三列 + 安全库存两列 + 1
+                    start_col = unfulfilled_orders_summary.shape[1] + 2 + 1  
                     end_col = start_col + len(pending_summary_cols) - 1
                 
-                    # 合并第一行
+                    # ✅ 合并第一行所有新列（不覆盖安全库存）
                     summary_sheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
                     summary_sheet.cell(row=1, column=start_col, value='未交订单').alignment = Alignment(horizontal='center', vertical='center')
                 
-                    # 写入第二行标题
+                    # ✅ 写入第二行标题
                     for idx, col in enumerate(pending_summary_cols, start=start_col):
                         summary_sheet.cell(row=2, column=idx, value=col).alignment = Alignment(horizontal='center', vertical='center')
                 
-                    # 写入第三行及以后数据（只写汇总部分，不写前三列）
+                    # ✅ 写入第三行及以后数据
                     for row_idx, row in enumerate(pending_summary_df[pending_summary_cols].itertuples(index=False), start=3):
                         for col_idx, value in enumerate(row, start=start_col):
                             summary_sheet.cell(row=row_idx, column=col_idx, value=value)
-
+                
 
 
 
