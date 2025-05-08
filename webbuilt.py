@@ -383,7 +383,7 @@ def main():
             for row_idx, used in enumerate(df_safety['已匹配'], start=2):  # Excel 从 1 开始，header 是第1行
                 if not used:
                     for col in range(1, len(df_safety.columns) + 1):
-                        safety_sheet.cell(row=row_idx, column=col).fill = openpyxl.styles.PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+                        safety_sheet.cell(row=row_idx, column=col).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
 
 
