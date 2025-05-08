@@ -268,7 +268,6 @@ def main():
                 worksheet['D2'] = 'InvWaf（片）'
                 worksheet['E2'] = 'InvPart'
                 
-                adjust_column_width(writer, '汇总', df_safety)
 
     
         # 下载按钮
