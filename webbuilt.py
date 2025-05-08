@@ -397,6 +397,7 @@ def main():
                             summary_sheet.cell(row=row_idx, column=col_idx, value=value)
 
                     ### 预测
+                    st.write('预测文件列名:', df_pred.columns.tolist())
                     # ✅ 重命名预测列方便匹配
                     df_pred.rename(columns={
                         '产品型号': '规格',
