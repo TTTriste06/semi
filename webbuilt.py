@@ -533,6 +533,33 @@ def main():
 
                 ###成品在制
                 # === 处理成品在制、半成品 ===
+                product_wip_pivoted = None
+
+                for f in uploaded_files:
+                    filename = f.name
+                    df = pd.read_excel(f)
+                    if filename == '赛卓-成品在制.xlsx':
+                        config_wip = CONFIG['pivot_config'][filename]
+                        if 'date_format' in config_wip and config_wip['columns'] in df.columns:
+                            df = process_date_column(df, config_wip['columns'], config_wip['date_format'])
+                        product_wip_pivoted = create_pivot(df, config_wip, filename, mapping_df)
+                        product_wip_pivoted.to_excel(writer, sheet_name='赛卓-成品在制', index=False)
+                    elif filename == '赛卓-未交订单.xlsx':
+                        config = CONFIG['pivot_config'][filename]
+                        df = process_date_column(df, config['columns'], config['date_format'])
+                        pivoted = create_pivot(df, config, filename, mapping_df)
+                        unfulfilled_orders_summary = pivoted[['晶圆品名', '规格', '品名']].drop_duplicates()
+                        pivoted.to_excel(writer, sheet_name='赛卓-未交订单', index=False)
+                    else:
+                        config = CONFIG['pivot_config'][filename]
+                        pivoted = create_pivot(df, config, filename, mapping_df)
+                        pivoted.to_excel(writer, sheet_name=filename.rstrip('.xlsx'), index=False)
+    
+                # 写入汇总 sheet
+                unfulfilled_orders_summary.to_excel(writer, sheet_name='汇总', index=False, startrow=1)
+                summary_sheet = writer.book['汇总']
+    
+                # === 处理成品在制、半成品 ===
                 if product_wip_pivoted is not None:
                     pending_cols = [col for col in product_wip_pivoted.columns if '未交' in col]
                     start_col = summary_sheet.max_column + 1
