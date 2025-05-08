@@ -55,33 +55,46 @@ CONFIG = {
 
 def upload_to_github(file, path_in_repo, commit_message):
     api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{path_in_repo}"
-    file_content = file.read()
-    encoded_content = base64.b64encode(file_content).decode('utf-8')
+    try:
+        file_content = file.read()
+        encoded_content = base64.b64encode(file_content).decode('utf-8')
+    except Exception as e:
+        st.error(f"⚠️ 文件读取失败: {e}")
+        return
 
-    response = requests.get(api_url, headers={
-        "Authorization": f"token {GITHUB_TOKEN}"
-    })
-    if response.status_code == 200:
-        sha = response.json()['sha']
-    else:
-        sha = None
+    try:
+        # 先获取 SHA
+        response = requests.get(api_url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
+        if response.status_code == 200:
+            sha = response.json().get('sha')
+            st.info(f"ℹ️ 检测到已有文件，SHA: {sha}")
+        else:
+            sha = None
+            st.info("ℹ️ 远程文件不存在，将新建上传。")
 
-    payload = {
-        "message": commit_message,
-        "content": encoded_content,
-        "branch": BRANCH
-    }
-    if sha:
-        payload["sha"] = sha
+        # 准备 payload
+        payload = {
+            "message": commit_message,
+            "content": encoded_content,
+            "branch": BRANCH
+        }
+        if sha:
+            payload["sha"] = sha
 
-    response = requests.put(api_url, json=payload, headers={
-        "Authorization": f"token {GITHUB_TOKEN}"
-    })
+        # 上传文件
+        response = requests.put(api_url, json=payload, headers={"Authorization": f"token {GITHUB_TOKEN}"})
 
-    if response.status_code in [200, 201]:
-        st.success(f"{path_in_repo} 上传成功！")
-    else:
-        st.error(f"上传失败: {response.json()}")
+        # 处理响应
+        if response.status_code in [200, 201]:
+            st.success(f"✅ {path_in_repo} 上传成功！")
+        else:
+            resp_json = response.json()
+            error_msg = resp_json.get('message', '未知错误')
+            st.error(f"❌ 上传失败：{response.status_code} - {error_msg}")
+            st.json(resp_json)
+
+    except Exception as e:
+        st.error(f"🚨 上传到 GitHub 失败: {e}")
 
 def preprocess_mapping_file(df):
     # 只取前6列
