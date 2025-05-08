@@ -242,12 +242,13 @@ def main():
         mapping_df = pd.read_excel(mapping_file)
         mapping_df = preprocess_mapping_file(mapping_df)
 
-    if pred_file and st.button("保存预测文件到 GitHub"):
+    if pred_file:
         upload_to_github(pred_file, "pred_file.xlsx", "上传预测文件")
-    if safety_file and st.button("保存安全库存文件到 GitHub"):
+    if safety_file:
         upload_to_github(safety_file, "safety_file.xlsx", "上传安全库存文件")
-    if mapping_file and st.button("保存新旧料号文件到 GitHub"):
+    if mapping_file:
         upload_to_github(mapping_file, "mapping_file.xlsx", "上传新旧料号文件")
+
 
     if st.button('提交并生成报告') and uploaded_files:
         with pd.ExcelWriter(CONFIG['output_file'], engine='openpyxl') as writer:
