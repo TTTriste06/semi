@@ -305,15 +305,23 @@ def main():
             df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False)
             adjust_column_width(writer, '赛卓-新旧料号', df_mapping)
 
-            # === 合并安全库存的 InvWaf 和 InvPart 到汇总表 ===
+            # 合并安全库存的 InvWaf 和 InvPart 到汇总表
             if not unfulfilled_orders_summary.empty and not df_safety.empty:
+                # 重命名安全库存列，对齐未交订单列名
+                rename_map = {'WaferID': '晶圆品名', 'OrderInformation': '规格', 'ProductionNO.': '品名'}
+                df_safety_renamed = df_safety.rename(columns=rename_map)
+            
+                # 只取需要的列
                 safety_cols = ['晶圆品名', '规格', '品名', 'InvWaf', 'InvPart']
-                safety_subset = df_safety[[col for col in safety_cols if col in df_safety.columns]].copy()
+                safety_subset = df_safety_renamed[[col for col in safety_cols if col in df_safety_renamed.columns]].copy()
+            
+                # 合并到未交订单的前三列上
                 unfulfilled_orders_summary = unfulfilled_orders_summary.merge(
                     safety_subset,
                     how='left',
                     on=['晶圆品名', '规格', '品名']
                 )
+
 
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
