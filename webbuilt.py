@@ -385,39 +385,57 @@ def main():
                             safety_sheet.cell(row=row_idx, column=col).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
                 ###未交订单
-                # 提取未交订单相关列
-                pending_cols = [col for col in pivoted.columns if '未交订单数量' in col and col != '历史未交订单数量']
+                # 1. 找到未交订单相关列
+                pending_cols = [col for col in pivoted.columns if col.startswith('未交订单数量_')]
                 
-                # 计算总未交订单数量
-                pivoted['总未交订单'] = pivoted[['历史未交订单数量'] + pending_cols].sum(axis=1)
-                
-                # 重新整理列顺序
-                order_cols = ['总未交订单', '历史未交订单数量'] + pending_cols
-                pivoted = pivoted[['晶圆品名', '规格', '品名'] + order_cols]
-                
-                # 写入 Excel，第三行开始（startrow=2，因为0索引，行3 = 2）
-                pivoted.to_excel(writer, sheet_name='汇总', index=False, startrow=2)
-                
-                # 获取 worksheet
+                # 2. 分历史和未来列
+                history_cols = []
+                future_cols = []
+                if CONFIG['selected_month']:
+                    for col in pending_cols:
+                        col_month = col.split('_')[-1]
+                        if col_month < CONFIG['selected_month']:
+                            history_cols.append(col)
+                        else:
+                            future_cols.append(col)
+                else:
+                    future_cols = pending_cols  # 没有指定月份，全当未来
+            
+                # 3. 计算历史未交订单数量
+                if history_cols:
+                    pivoted['历史未交订单数量'] = pivoted[history_cols].sum(axis=1)
+                else:
+                    pivoted['历史未交订单数量'] = 0
+            
+                # 4. 计算总未交订单数量（历史 + 未来）
+                pivoted['总未交订单'] = pivoted[['历史未交订单数量'] + future_cols].sum(axis=1)
+            
+                # 5. 按指定顺序整理列
+                order_cols = ['总未交订单', '历史未交订单数量'] + future_cols
+                final_cols = [col for col in ['晶圆品名', '规格', '品名'] if col in pivoted.columns] + order_cols
+                final_df = pivoted[final_cols]
+            
+                # 6. 写入 Excel，第3行开始
+                final_df.to_excel(writer, sheet_name='汇总', index=False, startrow=2)
+            
+                # 7. 写入标题行（第2行）和合并单元格（第1行）
                 worksheet = writer.book['汇总']
-                
-                # 第一行合并标题（未交订单部分）
-                start_col = 4  # 第四列（Excel D列）
-                end_col = 4 + len(order_cols) - 1
+                start_col = len(final_cols) - len(order_cols) + 1  # Excel列从1开始
+                end_col = len(final_cols)
                 start_letter = get_column_letter(start_col)
                 end_letter = get_column_letter(end_col)
                 worksheet.merge_cells(f'{start_letter}1:{end_letter}1')
                 worksheet[f'{start_letter}1'] = '未交订单'
                 worksheet[f'{start_letter}1'].alignment = Alignment(horizontal='center', vertical='center')
-                
-                # 第二行写列标题
+            
                 for idx, col_name in enumerate(order_cols, start=start_col):
                     cell = worksheet.cell(row=2, column=idx)
                     cell.value = col_name
                     cell.alignment = Alignment(horizontal='center', vertical='center')
-                
-                # 自动调整列宽
-                adjust_column_width(writer, '汇总', pivoted)
+            
+                # 8. 自动调整列宽
+                adjust_column_width(writer, '汇总', final_df)
+
 
 
 
