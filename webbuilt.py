@@ -400,14 +400,7 @@ def main():
                             summary_sheet.cell(row=row_idx, column=col_idx, value=value)
 
                     ### 预测
-                    # 先用 header=None 读前3行，检测哪一行包含'晶圆品名'
-                    df_preview = pd.read_excel(pred_file, header=None, nrows=3)
-                    if df_preview.isin(['晶圆品名']).any().any():
-                        header_row = df_preview.apply(lambda row: '晶圆品名' in row.values, axis=1).idxmax()
-                    else:
-                        header_row = 0  # 默认第一行
-                    
-                    # 用检测到的行作为 header 行读入
+                    header_row = 1
                     df_pred = pd.read_excel(pred_file, header=header_row)
 
                     st.write('预测文件列名:', df_pred.columns.tolist())
