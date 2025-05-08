@@ -287,7 +287,6 @@ def main():
                 df_safety = pd.read_excel(safety_file)
             else:
                 df_safety = download_backup_file("safety_file.xlsx")
-            st.write("安全库存表的原始列名：", df_safety.columns.tolist())
             df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
             adjust_column_width(writer, '赛卓-安全库存', df_safety)
 
@@ -384,7 +383,42 @@ def main():
                     if not used:
                         for col in range(1, len(df_safety.columns) + 1):
                             safety_sheet.cell(row=row_idx, column=col).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-        
+
+                ###未交订单
+                # 提取未交订单相关列
+                pending_cols = [col for col in pivoted.columns if '未交订单数量' in col and col != '历史未交订单数量']
+                
+                # 计算总未交订单数量
+                pivoted['总未交订单'] = pivoted[['历史未交订单数量'] + pending_cols].sum(axis=1)
+                
+                # 重新整理列顺序
+                order_cols = ['总未交订单', '历史未交订单数量'] + pending_cols
+                pivoted = pivoted[['晶圆品名', '规格', '品名'] + order_cols]
+                
+                # 写入 Excel，第三行开始（startrow=2，因为0索引，行3 = 2）
+                pivoted.to_excel(writer, sheet_name='汇总', index=False, startrow=2)
+                
+                # 获取 worksheet
+                worksheet = writer.book['汇总']
+                
+                # 第一行合并标题（未交订单部分）
+                start_col = 4  # 第四列（Excel D列）
+                end_col = 4 + len(order_cols) - 1
+                start_letter = get_column_letter(start_col)
+                end_letter = get_column_letter(end_col)
+                worksheet.merge_cells(f'{start_letter}1:{end_letter}1')
+                worksheet[f'{start_letter}1'] = '未交订单'
+                worksheet[f'{start_letter}1'].alignment = Alignment(horizontal='center', vertical='center')
+                
+                # 第二行写列标题
+                for idx, col_name in enumerate(order_cols, start=start_col):
+                    cell = worksheet.cell(row=2, column=idx)
+                    cell.value = col_name
+                    cell.alignment = Alignment(horizontal='center', vertical='center')
+                
+                # 自动调整列宽
+                adjust_column_width(writer, '汇总', pivoted)
+
 
 
         # 下载按钮
