@@ -295,9 +295,12 @@ def main():
             if pred_file:
                 df_pred = pd.read_excel(pred_file, header=1)
             else:
-                df_pred = download_backup_file("pred_file.xlsx")
-            df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
-            adjust_column_width(writer, '赛卓-预测', df_pred)
+                backup_file = download_backup_file("pred_file.xlsx")
+                if isinstance(backup_file, pd.DataFrame):
+                    df_pred = backup_file
+                else:
+                    df_pred = pd.read_excel(backup_file, header=1)
+
 
             # 写入新旧料号文件 sheet
             if mapping_file:
