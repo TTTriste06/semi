@@ -275,15 +275,19 @@ def main():
             
                 # 自动调整列宽
                 for idx, col in enumerate(worksheet.columns, 1):
-                    col_letter = get_column_letter(idx)  # 用 index 转字母
+                    col_letter = get_column_letter(idx)
                     max_length = 0
                     for cell in col:
                         try:
                             if cell.value:
-                                max_length = max(max_length, len(str(cell.value)))
+                                cell_len = len(str(cell.value))
+                                # 中文字符按1.5倍宽度处理
+                                cell_len = sum(2 if ord(char) > 127 else 1 for char in str(cell.value))
+                                max_length = max(max_length, cell_len)
                         except:
                             pass
-                    worksheet.column_dimensions[col_letter].width = max_length + 2  # +2 预留余量
+                    worksheet.column_dimensions[col_letter].width = max_length + 5  # 留余量
+
                                 
 
     
