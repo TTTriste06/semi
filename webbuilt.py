@@ -107,6 +107,15 @@ def download_mapping_from_github(path_in_repo):
         st.warning("GitHub 上找不到 mapping_file.xlsx，用默认表或请先上传")
         return pd.DataFrame(columns=['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名'])
 
+def download_backup_file(file_name):
+    url = f"https://raw.githubusercontent.com/{REPO_NAME}/{BRANCH}/{file_name}"
+    response = requests.get(url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
+    if response.status_code == 200:
+        from io import BytesIO
+        return pd.read_excel(BytesIO(response.content))
+    else:
+        st.warning(f"无法下载 {file_name}，创建空 sheet")
+        return pd.DataFrame()
         
 def process_date_column(df, date_col, date_format):
     if pd.api.types.is_numeric_dtype(df[date_col]):
@@ -240,20 +249,27 @@ def main():
             # 写入安全库存 sheet
             if safety_file:
                 df_safety = pd.read_excel(safety_file)
-                df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
-                adjust_column_width(writer, '赛卓-安全库存', df_safety)
-    
+            else:
+                df_safety = download_backup_file("safety_file.xlsx")
+            df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
+            adjust_column_width(writer, '赛卓-安全库存', df_safety)
+            
             # 写入预测文件 sheet
             if pred_file:
                 df_pred = pd.read_excel(pred_file)
-                df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
-                adjust_column_width(writer, '赛卓-预测', df_pred)
-    
+            else:
+                df_pred = download_backup_file("pred_file.xlsx")
+            df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
+            adjust_column_width(writer, '赛卓-预测', df_pred)
+            
             # 写入新旧料号文件 sheet
             if mapping_file:
                 df_mapping = pd.read_excel(mapping_file)
-                df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False)
-                adjust_column_width(writer, '赛卓-新旧料号', df_mapping)
+            else:
+                df_mapping = download_backup_file("mapping_file.xlsx")
+            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False)
+            adjust_column_width(writer, '赛卓-新旧料号', df_mapping)
+
     
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
