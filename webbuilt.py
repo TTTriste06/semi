@@ -402,8 +402,8 @@ def main():
                 # === 处理预测 sheet ===
                 if not df_pred.empty:
                     # 确保第二行是 header
-                    df_pred.columns = df_pred.iloc[1]
-                    df_pred = df_pred.drop([0, 1]).reset_index(drop=True)
+                    df_pred.columns = df_pred.iloc[0]
+                    df_pred = df_pred.drop([0, 0]).reset_index(drop=True)
 
                     st.write("预测文件列名：", df_pred.columns.tolist())
                 
