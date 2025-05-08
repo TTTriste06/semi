@@ -465,40 +465,41 @@ def main():
                         add_black_border(summary_sheet, 2, summary_sheet.max_column)
                         
                 ###成品库存
-                # === 处理产品库存写入汇总 sheet ===
-                if not df_safety.empty:
-                    # 确保列存在
+                # === 处理成品库存写入汇总 sheet ===
+                # 从 uploaded_files 里提取成品库存
+                product_inventory_file = next((f for f in uploaded_files if f.name == "赛卓-成品库存.xlsx"), None)
+                if product_inventory_file:
+                    df_inventory = pd.read_excel(product_inventory_file)
+                    # 检查所需列
                     required_columns = ['WAFER品名', '规格', '品名', '数量_HOLD仓', '数量_成品仓', '数量_半成品仓']
-                    if all(col in df_safety.columns for col in required_columns):
-                        # 构造 key 进行匹配
-                        inventory_key = df_safety[['WAFER品名', '规格', '品名']].astype(str)
+                    if all(col in df_inventory.columns for col in required_columns):
+                        # 构造 key
+                        inventory_key = df_inventory[['WAFER品名', '规格', '品名']].astype(str)
                         summary_key = unfulfilled_orders_summary[['晶圆品名', '规格', '品名']].astype(str)
                 
-                        # 在产品库存表中加匹配标志
-                        df_safety['已匹配'] = False
+                        df_inventory['已匹配'] = False
                 
                         # 定位汇总 sheet
                         summary_sheet = writer.sheets['汇总']
-                        start_col = summary_sheet.max_column + 1  # 空白列的起点
+                        start_col = summary_sheet.max_column + 1
                 
-                        # 合并第一行单元格写入“成品库存”
+                        # 合并第一行写“成品库存”
                         summary_sheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=start_col+2)
                         summary_sheet.cell(row=1, column=start_col, value='成品库存').alignment = Alignment(horizontal='center', vertical='center')
                         summary_sheet.cell(row=2, column=start_col, value='数量_HOLD仓').alignment = Alignment(horizontal='center', vertical='center')
                         summary_sheet.cell(row=2, column=start_col+1, value='数量_成品仓').alignment = Alignment(horizontal='center', vertical='center')
                         summary_sheet.cell(row=2, column=start_col+2, value='数量_半成品仓').alignment = Alignment(horizontal='center', vertical='center')
                 
-                        # 遍历汇总 sheet 的数据行（从第3行开始）
+                        # 遍历汇总表行（从第3行开始）
                         for row_idx in range(3, summary_sheet.max_row + 1):
                             summary_wf = summary_sheet.cell(row=row_idx, column=1).value
                             summary_spec = summary_sheet.cell(row=row_idx, column=2).value
                             summary_prod = summary_sheet.cell(row=row_idx, column=3).value
                 
-                            # 查找产品库存表匹配行
-                            match = df_safety[
-                                (df_safety['WAFER品名'].astype(str) == str(summary_wf)) &
-                                (df_safety['规格'].astype(str) == str(summary_spec)) &
-                                (df_safety['品名'].astype(str) == str(summary_prod))
+                            match = df_inventory[
+                                (df_inventory['WAFER品名'].astype(str) == str(summary_wf)) &
+                                (df_inventory['规格'].astype(str) == str(summary_spec)) &
+                                (df_inventory['品名'].astype(str) == str(summary_prod))
                             ]
                 
                             if not match.empty:
@@ -509,16 +510,15 @@ def main():
                                 summary_sheet.cell(row=row_idx, column=start_col+1, value=finished)
                                 summary_sheet.cell(row=row_idx, column=start_col+2, value=semi_finished)
                 
-                                # 标记库存表的行
-                                df_safety.loc[match.index, '已匹配'] = True
+                                df_inventory.loc[match.index, '已匹配'] = True
                 
-                        # 在产品库存 sheet 中标红未匹配的行
+                        # 在成品库存 sheet 中标红未匹配行
                         inventory_sheet = writer.book['赛卓-成品库存']
-                        for row_idx, matched in enumerate(df_safety['已匹配'], start=2):  # Excel 从第2行开始（含 header）
+                        for row_idx, matched in enumerate(df_inventory['已匹配'], start=2):
                             if not matched:
-                                for col_idx in range(1, len(df_safety.columns) + 1):
+                                for col_idx in range(1, len(df_inventory.columns) + 1):
                                     inventory_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-
+                
 
                 # 自动调整列宽
                 for idx, col in enumerate(worksheet.columns, 1):
