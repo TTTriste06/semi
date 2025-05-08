@@ -260,14 +260,30 @@ def main():
 
                 worksheet = writer.book['汇总']
                 
-                # 合并 D1:E1（即第4,5列的第一行）并写入 "安全库存"
+                # 合并 D1:E1（第4,5列的第一行）并写入 "安全库存"
                 worksheet.merge_cells('D1:E1')
                 worksheet['D1'] = '安全库存'
-                
+                worksheet['D1'].alignment = Alignment(horizontal='center', vertical='center')
+            
                 # 设置 D2, E2 的标题
                 worksheet['D2'] = 'InvWaf（片）'
+                worksheet['D2'].alignment = Alignment(horizontal='center', vertical='center')
                 worksheet['E2'] = 'InvPart'
-                
+                worksheet['E2'].alignment = Alignment(horizontal='center', vertical='center')
+            
+                # 自动调整列宽
+                for col in worksheet.columns:
+                    max_length = 0
+                    col_letter = col[0].column_letter  # 获取列字母
+                    for cell in col:
+                        try:
+                            if cell.value:
+                                max_length = max(max_length, len(str(cell.value)))
+                        except:
+                            pass
+                    adjusted_width = max_length + 4  # 可以根据需要调整这个偏移量
+                    worksheet.column_dimensions[col_letter].width = adjusted_width
+                            
 
     
         # 下载按钮
