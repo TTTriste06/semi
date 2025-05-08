@@ -119,6 +119,33 @@ def download_excel_from_github(url, token=None):
 
     return pd.read_excel(BytesIO(response.content))
 
+import pandas as pd
+import requests
+from io import BytesIO
+
+def download_backup_file(file_name):
+    api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{file_name}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    response = requests.get(api_url, headers=headers)
+
+    if response.status_code != 200:
+        st.warning(f"⚠️ 无法下载 {file_name}，GitHub 返回码 {response.status_code}")
+        return pd.DataFrame()  # 返回空 DataFrame，保证主程序不崩溃
+
+    content = response.json().get('content')
+    if not content:
+        st.warning(f"⚠️ {file_name} 文件内容为空或解析失败")
+        return pd.DataFrame()
+
+    file_bytes = BytesIO(base64.b64decode(content))
+
+    try:
+        df = pd.read_excel(file_bytes)
+    except Exception as e:
+        st.warning(f"⚠️ {file_name} 解析 Excel 失败：{e}，将创建空 sheet。")
+        return pd.DataFrame()
+
+    return df
         
 def process_date_column(df, date_col, date_format):
     if pd.api.types.is_numeric_dtype(df[date_col]):
