@@ -465,19 +465,26 @@ def main():
                         add_black_border(summary_sheet, 2, summary_sheet.max_column)
                         
                 ###成品库存
-                # === 处理成品库存写入汇总 sheet ===
-                # 从 uploaded_files 里提取成品库存
-                product_inventory_file = next((f for f in uploaded_files if f.name == "赛卓-成品库存.xlsx"), None)
-                if product_inventory_file:
-                    df_inventory = pd.read_excel(product_inventory_file)
-                    # 检查所需列
+                # === 从生成的赛卓-成品库存中提取信息，写入汇总 sheet ===
+                # 先找生成的赛卓-成品库存 DataFrame
+                product_inventory_pivoted = None
+                for f in uploaded_files:
+                    if f.name == "赛卓-成品库存.xlsx":
+                        df_product_inventory = pd.read_excel(f)
+                        config_inventory = CONFIG['pivot_config']['赛卓-成品库存.xlsx']
+                        if 'date_format' in config_inventory and config_inventory['columns'] in df_product_inventory.columns:
+                            df_product_inventory = process_date_column(df_product_inventory, config_inventory['columns'], config_inventory['date_format'])
+                        product_inventory_pivoted = create_pivot(df_product_inventory, config_inventory, f.name, mapping_df)
+                        break
+                
+                if product_inventory_pivoted is not None:
                     required_columns = ['WAFER品名', '规格', '品名', '数量_HOLD仓', '数量_成品仓', '数量_半成品仓']
-                    if all(col in df_inventory.columns for col in required_columns):
+                    if all(col in product_inventory_pivoted.columns for col in required_columns):
                         # 构造 key
-                        inventory_key = df_inventory[['WAFER品名', '规格', '品名']].astype(str)
+                        inventory_key = product_inventory_pivoted[['WAFER品名', '规格', '品名']].astype(str)
                         summary_key = unfulfilled_orders_summary[['晶圆品名', '规格', '品名']].astype(str)
                 
-                        df_inventory['已匹配'] = False
+                        product_inventory_pivoted['已匹配'] = False
                 
                         # 定位汇总 sheet
                         summary_sheet = writer.sheets['汇总']
@@ -496,10 +503,10 @@ def main():
                             summary_spec = summary_sheet.cell(row=row_idx, column=2).value
                             summary_prod = summary_sheet.cell(row=row_idx, column=3).value
                 
-                            match = df_inventory[
-                                (df_inventory['WAFER品名'].astype(str) == str(summary_wf)) &
-                                (df_inventory['规格'].astype(str) == str(summary_spec)) &
-                                (df_inventory['品名'].astype(str) == str(summary_prod))
+                            match = product_inventory_pivoted[
+                                (product_inventory_pivoted['WAFER品名'].astype(str) == str(summary_wf)) &
+                                (product_inventory_pivoted['规格'].astype(str) == str(summary_spec)) &
+                                (product_inventory_pivoted['品名'].astype(str) == str(summary_prod))
                             ]
                 
                             if not match.empty:
@@ -510,15 +517,15 @@ def main():
                                 summary_sheet.cell(row=row_idx, column=start_col+1, value=finished)
                                 summary_sheet.cell(row=row_idx, column=start_col+2, value=semi_finished)
                 
-                                df_inventory.loc[match.index, '已匹配'] = True
+                                product_inventory_pivoted.loc[match.index, '已匹配'] = True
                 
-                        # 在成品库存 sheet 中标红未匹配行
+                        # 在赛卓-成品库存 sheet 中标红未匹配行
                         inventory_sheet = writer.book['赛卓-成品库存']
-                        for row_idx, matched in enumerate(df_inventory['已匹配'], start=2):
+                        for row_idx, matched in enumerate(product_inventory_pivoted['已匹配'], start=2):
                             if not matched:
-                                for col_idx in range(1, len(df_inventory.columns) + 1):
+                                for col_idx in range(1, len(product_inventory_pivoted.columns) + 1):
                                     inventory_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-                
+
 
                 # 自动调整列宽
                 for idx, col in enumerate(worksheet.columns, 1):
