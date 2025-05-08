@@ -334,22 +334,7 @@ def main():
 
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
-                st.write("✅ unfulfilled_orders_summary（未交订单汇总）非空，行数：", len(unfulfilled_orders_summary))
-            else:
-                st.warning("⚠️ unfulfilled_orders_summary 是空的，没有未交订单汇总数据。")
             
-            if not df_safety.empty:
-                st.write("✅ df_safety（安全库存表）非空，行数：", len(df_safety))
-            else:
-                st.warning("⚠️ df_safety 是空的，没有安全库存数据。")
-            
-            if not unfulfilled_orders_summary.empty and not df_safety.empty:
-                
-
-                
-
-            
-
             
                 worksheet = writer.book['汇总']
             
