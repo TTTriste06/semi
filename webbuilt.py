@@ -108,25 +108,16 @@ def download_mapping_from_github(path_in_repo):
         st.warning("GitHub 上找不到 mapping_file.xlsx，用默认表或请先上传")
         return pd.DataFrame(columns=['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名'])
 
-def download_backup_file(file_name):
-    url = f"https://raw.githubusercontent.com/{REPO_NAME}/{BRANCH}/{file_name}"
-    response = requests.get(url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
-    
-    if response.status_code == 200:
-        content_type = response.headers.get("Content-Type", "")
-        # 检查内容类型
-        if "application/vnd.openxmlformats-officedocument" in content_type or file_name.endswith(".xlsx"):
-            try:
-                return pd.read_excel(BytesIO(response.content))
-            except Exception as e:
-                st.warning(f"{file_name} 下载成功，但解析 Excel 出错：{e}，将创建空 sheet。")
-                return pd.DataFrame()
-        else:
-            st.warning(f"{file_name} 下载成功，但不是 Excel 文件，将创建空 sheet。")
-            return pd.DataFrame()
-    else:
-        st.warning(f"无法下载 {file_name}（状态码：{response.status_code}），将创建空 sheet。")
-        return pd.DataFrame()
+def download_excel_from_github(url, token=None):
+    headers = {"Authorization": f"token {token}"} if token else {}
+    response = requests.get(url, headers=headers)
+    content_type = response.headers.get('Content-Type', '')
+
+    # 检查文件是不是 Excel
+    if 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' not in content_type:
+        raise ValueError("下载的不是 Excel 文件，请检查 GitHub 链接或权限")
+
+    return pd.read_excel(BytesIO(response.content))
 
         
 def process_date_column(df, date_col, date_format):
