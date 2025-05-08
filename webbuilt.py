@@ -398,75 +398,70 @@ def main():
                         for col_idx, value in enumerate(row, start=start_col):
                             summary_sheet.cell(row=row_idx, column=col_idx, value=value)
 
-                    ### 预测
-                    header_row = 1
-                    df_pred = pd.read_excel(pred_file, header=header_row)
-
-                    st.write('预测文件列名:', df_pred.columns.tolist())
-                    # ✅ 重命名预测列方便匹配
-                    df_pred.rename(columns={
-                        '产品型号': '规格',
-                        'ProductionNO.': '品名'
-                    }, inplace=True)
-                    
-                    # ✅ 给 df_pred 添加标志列（是否已匹配）
+                ### 预测
+                # === 处理预测 sheet ===
+                if not df_pred.empty:
+                    # 确保第二行是 header
+                    df_pred.columns = df_pred.iloc[1]
+                    df_pred = df_pred.drop([0, 1]).reset_index(drop=True)
+                
+                    # 添加匹配标志
                     df_pred['已匹配'] = False
-                    
-                    # ✅ 从汇总 sheet 中取 key 列
-                    summary_keys = unfulfilled_orders_summary[['晶圆品名', '规格', '品名']].drop_duplicates()
-                    
-                    # ✅ merge 预测数据
-                    summary_with_pred = summary_keys.merge(
-                        df_pred[['晶圆品名', '规格', '品名', '合计数量', '合计金额']],
-                        on=['晶圆品名', '规格', '品名'],
-                        how='left'
-                    )
-                    
-                    # ✅ 标记预测数据中哪些被使用了
-                    matched_keys = summary_with_pred.dropna(subset=['合计数量', '合计金额'])[['晶圆品名', '规格', '品名']]
-                    matched_keys['key'] = matched_keys.apply(lambda row: f"{row['晶圆品名']}_{row['规格']}_{row['品名']}", axis=1)
-                    df_pred['key'] = df_pred.apply(lambda row: f"{row['晶圆品名']}_{row['规格']}_{row['品名']}", axis=1)
-                    df_pred['已匹配'] = df_pred['key'].isin(matched_keys['key'])
-                    df_pred.drop(columns=['key'], inplace=True)
-                    
-                    # ✅ 写入汇总 sheet
-                    summary_sheet = writer.sheets['汇总']
-                    start_col = unfulfilled_orders_summary.shape[1] + 2 + len(pending_summary_cols) + 1
-                    end_col = start_col + 1
-                    
-                    # ✅ 合并第一行
-                    summary_sheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
-                    summary_sheet.cell(row=1, column=start_col, value='预测').alignment = Alignment(horizontal='center', vertical='center')
-                    
-                    # ✅ 写入第二行标题
-                    summary_sheet.cell(row=2, column=start_col, value='合计数量').alignment = Alignment(horizontal='center', vertical='center')
-                    summary_sheet.cell(row=2, column=start_col + 1, value='合计金额').alignment = Alignment(horizontal='center', vertical='center')
-                    
-                    # ✅ 写入第三行及以后数据
-                    for row_idx, row in enumerate(summary_with_pred[['合计数量', '合计金额']].itertuples(index=False), start=3):
-                        summary_sheet.cell(row=row_idx, column=start_col, value=row[0])
-                        summary_sheet.cell(row=row_idx, column=start_col + 1, value=row[1])
-                    
-                    # ✅ 标红预测 sheet 中未被使用的行
-                    pred_sheet = writer.sheets['赛卓-预测']
-                    for row_idx, used in enumerate(df_pred['已匹配'], start=2):  # Excel 从 1 开始，header 在第1行
-                        if not used:
+                    df_pred['合计数量'] = None
+                    df_pred['合计金额'] = None
+                
+                    # 构造 key 进行匹配
+                    pred_key = df_pred[['晶圆品名', '产品型号', 'ProductionNO.']].astype(str)
+                    summary_key = unfulfilled_orders_summary[['晶圆品名', '规格', '品名']].astype(str)
+                
+                    # 在预测表中逐行查找匹配行
+                    for idx, pred_row in pred_key.iterrows():
+                        match = ((summary_key['晶圆品名'] == pred_row['晶圆品名']) &
+                                 (summary_key['规格'] == pred_row['产品型号']) &
+                                 (summary_key['品名'] == pred_row['ProductionNO.']))
+                        if match.any():
+                            df_pred.at[idx, '已匹配'] = True
+                            # 这里可以填入合计数量和金额的值（示例用 100 和 200，换成你实际的计算）
+                            df_pred.at[idx, '合计数量'] = 100
+                            df_pred.at[idx, '合计金额'] = 200
+                
+                    # 写入 Excel，保留 header
+                    df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False, startrow=1)
+                    adjust_column_width(writer, '赛卓-预测', df_pred)
+                
+                    pred_sheet = writer.book['赛卓-预测']
+                
+                    # 合并第一行单元格并写入 “预测”
+                    pred_sheet.merge_cells('A1:B1')
+                    pred_sheet['A1'] = '预测'
+                    pred_sheet['A1'].alignment = Alignment(horizontal='center', vertical='center')
+                
+                    # 写入第二行标题（确保列名在 A2 开始）
+                    pred_sheet['A2'] = '合计数量'
+                    pred_sheet['B2'] = '合计金额'
+                    pred_sheet['A2'].alignment = Alignment(horizontal='center', vertical='center')
+                    pred_sheet['B2'].alignment = Alignment(horizontal='center', vertical='center')
+                
+                    # 标红未匹配的行（Excel 从 1 开始，且跳过 header，注意偏移）
+                    for row_idx, matched in enumerate(df_pred['已匹配'], start=3):  # 因为数据从第3行开始
+                        if not matched:
                             for col_idx in range(1, len(df_pred.columns) + 1):
                                 pred_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+
                     
 
-                    # 自动调整列宽
-                    for idx, col in enumerate(worksheet.columns, 1):
-                        col_letter = get_column_letter(idx)
-                        max_length = 0
-                        for cell in col:
-                            try:
-                                if cell.value:
-                                    cell_len = sum(2 if ord(char) > 127 else 1 for char in str(cell.value))
-                                    max_length = max(max_length, cell_len)
-                            except:
-                                pass
-                        worksheet.column_dimensions[col_letter].width = max_length + 5
+                # 自动调整列宽
+                for idx, col in enumerate(worksheet.columns, 1):
+                    col_letter = get_column_letter(idx)
+                    max_length = 0
+                    for cell in col:
+                        try:
+                            if cell.value:
+                                cell_len = sum(2 if ord(char) > 127 else 1 for char in str(cell.value))
+                                max_length = max(max_length, cell_len)
+                        except:
+                               pass
+                    worksheet.column_dimensions[col_letter].width = max_length + 5
                     
 
 
