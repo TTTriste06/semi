@@ -307,38 +307,6 @@ def main():
 
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
-                unfulfilled_orders_summary.to_excel(writer, sheet_name='汇总', index=False, startrow=1)
-                adjust_column_width(writer, '汇总', unfulfilled_orders_summary)
-
-                worksheet = writer.book['汇总']
-
-                # 合并 D1:E1（第4,5列的第一行）并写入 "安全库存"
-                worksheet.merge_cells('D1:E1')
-                worksheet['D1'] = '安全库存'
-                worksheet['D1'].alignment = Alignment(horizontal='center', vertical='center')
-
-                # 设置 D2, E2 的标题
-                worksheet['D2'] = 'InvWaf（片）'
-                worksheet['D2'].alignment = Alignment(horizontal='center', vertical='center')
-                worksheet['E2'] = 'InvPart'
-                worksheet['E2'].alignment = Alignment(horizontal='center', vertical='center')
-
-                # 自动调整列宽
-                for idx, col in enumerate(worksheet.columns, 1):
-                    col_letter = get_column_letter(idx)
-                    max_length = 0
-                    for cell in col:
-                        try:
-                            if cell.value:
-                                s = str(cell.value)
-                                cell_len = sum(2 if ord(char) > 127 else 1 for char in s)
-                                max_length = max(max_length, cell_len)
-                        except:
-                            pass
-                    worksheet.column_dimensions[col_letter].width = max_length + 5
-
-            # 合并安全库存的 InvWaf 和 InvPart 到汇总表
-            if not unfulfilled_orders_summary.empty:
                 # 如果有安全库存文件，准备 InvWaf 和 InvPart 信息
                 if not df_safety.empty:
                     # 重命名安全库存列
