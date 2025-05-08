@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment
 from openpyxl.styles import PatternFill
+from openpyxl.styles import Border, Side
 
 
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
@@ -219,6 +220,13 @@ def adjust_column_width(writer, sheet_name, df):
         header_len = len(str(col))
         width = max(max_len, header_len) * 1.2 + 5
         worksheet.column_dimensions[get_column_letter(idx)].width = min(width, 50)
+
+def add_black_border(ws, row_count, col_count):
+    thin = Side(border_style="thin", color="000000")
+    border = Border(top=thin, left=thin, right=thin, bottom=thin)
+    for row in ws.iter_rows(min_row=1, max_row=row_count, min_col=1, max_col=col_count):
+        for cell in row:
+            cell.border = border
 
 def main():
     st.set_page_config(
@@ -464,6 +472,14 @@ def main():
                         except:
                                pass
                     worksheet.column_dimensions[col_letter].width = max_length + 5
+
+            # === 在汇总 sheet 加黑框 ===
+            summary_sheet = writer.book['汇总']
+            # 假设前两行是标题
+            max_row = 2  
+            max_col = summary_sheet.max_column
+            add_black_border(summary_sheet, max_row, max_col)
+
                     
 
 
