@@ -282,39 +282,13 @@ def main():
                     unfulfilled_orders_summary = pivoted[cols_to_copy].drop_duplicates()
 
             # 写入安全库存 sheet
-            # 读取或下载安全库存文件
             if safety_file:
                 df_safety = pd.read_excel(safety_file)
             else:
                 df_safety = download_backup_file("safety_file.xlsx")
             st.write("安全库存表的原始列名：", df_safety.columns.tolist())
-    
-            expected_original_cols = ['WaferID', 'OrderInformation', 'ProductionNO.']
-            missing_cols = [col for col in expected_original_cols if col not in df_safety.columns]
-    
-            if missing_cols:
-                st.error(f"❌ 安全库存表缺少这些关键列：{missing_cols}")
-                df_safety_renamed = pd.DataFrame()
-            else:
-                df_safety_renamed = df_safety.rename(columns={
-                    'WaferID': '晶圆品名',
-                    'OrderInformation': '规格',
-                    'ProductionNO.': '品名'
-                })
-                st.write("重命名后的列名：", df_safety_renamed.columns.tolist())
-    
-            if not df_safety_renamed.empty and 'InvWaf' in df_safety_renamed.columns and 'InvPart' in df_safety_renamed.columns:
-                df_safety_subset = df_safety_renamed[['晶圆品名', '规格', '品名', 'InvWaf', 'InvPart']].copy()
-                st.write("✅ 成功创建安全库存子集，行数：", len(df_safety_subset))
-            else:
-                st.warning("⚠️ 安全库存表中缺少 'InvWaf' 或 'InvPart' 列，将创建空表")
-                df_safety_subset = pd.DataFrame(columns=['晶圆品名', '规格', '品名', 'InvWaf', 'InvPart'])
-    
             df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
             adjust_column_width(writer, '赛卓-安全库存', df_safety)
-    
-            # 后续写入预测、新旧料号、汇总等（保持你原来的逻辑）
-
 
             # 写入预测文件 sheet
             if pred_file:
@@ -334,8 +308,6 @@ def main():
 
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
-            
-            
                 worksheet = writer.book['汇总']
             
                 # 合并 D1:E1（第4,5列的第一行）写“安全库存”
