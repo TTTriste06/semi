@@ -257,6 +257,8 @@ def main():
             if not unfulfilled_orders_summary.empty:
                 unfulfilled_orders_summary.to_excel(writer, sheet_name='汇总', index=False, startrow=1)
                 adjust_column_width(writer, '汇总', unfulfilled_orders_summary)
+
+                worksheet = writer.book['汇总']
                 
                 # 合并 D1:E1（即第4,5列的第一行）并写入 "安全库存"
                 worksheet.merge_cells('D1:E1')
