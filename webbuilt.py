@@ -292,14 +292,31 @@ def main():
             adjust_column_width(writer, '赛卓-安全库存', df_safety)
 
             # 写入预测文件 sheet
+
             if pred_file:
-                df_pred = pd.read_excel(pred_file, header=1)
+                # 如果是 UploadedFile，把它转成 BytesIO
+                file_to_read = io.BytesIO(pred_file.getbuffer())
             else:
-                backup_file = download_backup_file("pred_file.xlsx")
-                if isinstance(backup_file, pd.DataFrame):
-                    df_pred = backup_file
-                else:
-                    df_pred = pd.read_excel(backup_file, header=1)
+                file_to_read = download_backup_file("pred_file.xlsx")
+            
+            # 如果 file_to_read 已经是 DataFrame，不用再读
+            if isinstance(file_to_read, pd.DataFrame):
+                df_pred = file_to_read
+            else:
+                try:
+                    # 先预读几行，检查 header 行
+                    df_preview = pd.read_excel(file_to_read, header=None, nrows=3)
+                    if df_preview.isin(['晶圆品名']).any().any():
+                        header_row = df_preview.apply(lambda row: '晶圆品名' in row.values, axis=1).idxmax()
+                    else:
+                        header_row = 0  # 默认第一行
+                    
+                    # 重新回到文件开头（BytesIO必须重置指针！）
+                    file_to_read.seek(0)
+                    df_pred = pd.read_excel(file_to_read, header=header_row)
+                except Exception as e:
+                    st.error(f"预测文件读取失败：{e}")
+                    df_pred = pd.DataFrame()
 
 
             # 写入新旧料号文件 sheet
