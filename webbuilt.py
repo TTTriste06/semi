@@ -228,6 +228,11 @@ def add_black_border(ws, row_count, col_count):
         for cell in row:
             cell.border = border
 
+def preprocess_mapping_file(df):
+    df = df.iloc[:, :9]  # 保留前9列
+    df.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
+    return df
+
 def main():
     st.set_page_config(
         page_title='我是标题',
@@ -572,8 +577,19 @@ def main():
                             (mapping_df['旧规格'].astype(str) == str(summary_spec)) &
                             (mapping_df['旧品名'].astype(str) == str(summary_prod))
                         ]
-                        if not map_match.empty and not pd.isna(map_match['新晶圆品名'].values[0]):
-                            half_prod_name = map_match['新晶圆品名'].values[0]
+                        if not mapping_df.empty and all(col in mapping_df.columns for col in ['旧晶圆品名', '旧规格', '旧品名', '半成品']):
+                            map_match = mapping_df[
+                                (mapping_df['旧晶圆品名'].astype(str) == str(summary_wf)) &
+                                (mapping_df['旧规格'].astype(str) == str(summary_spec)) &
+                                (mapping_df['旧品名'].astype(str) == str(summary_prod))
+                            ]
+                            if not map_match.empty and not pd.isna(map_match['半成品'].values[0]):
+                                half_prod_name = map_match['半成品'].values[0]
+                            else:
+                                half_prod_name = None
+                        else:
+                            half_prod_name = None
+
                 
                         sum_half = 0
                         if half_prod_name:
@@ -585,7 +601,13 @@ def main():
                             sum_half = half_match[pending_cols].sum(axis=1).sum() if not half_match.empty else 0
                 
                         summary_sheet.cell(row=row_idx, column=start_col + 1, value=sum_half)
-                
+                    # --- 在成品在制 sheet 里标红未用到的行 ---
+                    wip_sheet = writer.book['赛卓-成品在制']
+                    for row_idx, matched in enumerate(product_wip_pivoted['已匹配'], start=2):  # Excel 第2行起是数据
+                        if not matched:
+                            for col_idx in range(1, len(product_wip_pivoted.columns) + 1):
+                                wip_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+                                    
 
                 # 自动调整列宽
                 for idx, col in enumerate(worksheet.columns, 1):
