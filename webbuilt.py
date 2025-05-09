@@ -589,51 +589,94 @@ def main():
                     if col not in mapping_df.columns:
                         mapping_df[col] = None
 
+                
                 semi_finished_value = 0
-                semi_row = pd.DataFrame()  # 先定义为空 DataFrame
+                semi_row = pd.DataFrame()  # ✅ 先定义为空 DataFrame
+                # 先检查 mapping_df 是否存在
+                if mapping_df is not None:
+                    st.write("📦 mapping_df 当前内容：")
+                    st.dataframe(mapping_df)
+                else:
+                    st.warning("⚠️ mapping_df 是 None，没有读取到任何内容。")
+    
                 
-                if mapping_df is not None and not mapping_df.empty:
-                    semi_match = mapping_df[
-                        (mapping_df['新晶圆品名'].astype(str) == str(summary_wf)) &
-                        (mapping_df['新规格'].astype(str) == str(summary_spec)) &
-                        (mapping_df['半成品'].astype(str) == str(summary_prod))
-                    ]
+        
+                product_in_progress_pivoted = None
+                for f in uploaded_files:
+                    if f.name == "赛卓-成品在制.xlsx":
+                        df_product_in_progress = pd.read_excel(f)
+                        config_in_progress = CONFIG['pivot_config']['赛卓-成品在制.xlsx']
+                        if 'date_format' in config_in_progress and config_in_progress['columns'] in df_product_in_progress.columns:
+                            df_product_in_progress = process_date_column(df_product_in_progress, config_in_progress['columns'], config_in_progress['date_format'])
+                        product_in_progress_pivoted = create_pivot(df_product_in_progress, config_in_progress, f.name, mapping_df)
+                        break
                 
-                    if not semi_match.empty:
-                        semi_wafer = semi_match['新晶圆品名'].values[0]
-                        semi_spec = semi_match['新规格'].values[0]
-                        semi_prod = semi_match['新品名'].values[0]
+                if product_in_progress_pivoted is not None:
+                    numeric_cols = product_in_progress_pivoted.select_dtypes(include='number').columns.tolist()
+                    product_in_progress_pivoted['已匹配'] = False
                 
-                        semi_row = product_in_progress_pivoted[
-                            (product_in_progress_pivoted['晶圆型号'].astype(str) == str(semi_wafer)) &
-                            (product_in_progress_pivoted['产品规格'].astype(str) == str(semi_spec)) &
-                            (product_in_progress_pivoted['产品品名'].astype(str) == str(semi_prod))
+                    summary_sheet = writer.sheets['汇总']
+                    start_col = summary_sheet.max_column + 1
+                
+                    summary_sheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=start_col + 1)
+                    summary_sheet.cell(row=1, column=start_col, value='赛卓-成品在制').alignment = Alignment(horizontal='center', vertical='center')
+                    summary_sheet.cell(row=2, column=start_col, value='成品').alignment = Alignment(horizontal='center', vertical='center')
+                    summary_sheet.cell(row=2, column=start_col + 1, value='半成品').alignment = Alignment(horizontal='center', vertical='center')
+                
+                    for row_idx in range(3, summary_sheet.max_row + 1):
+                        summary_wf = summary_sheet.cell(row=row_idx, column=1).value
+                        summary_spec = summary_sheet.cell(row=row_idx, column=2).value
+                        summary_prod = summary_sheet.cell(row=row_idx, column=3).value
+                
+                        # 直接找成品
+                        match = product_in_progress_pivoted[
+                            (product_in_progress_pivoted['晶圆型号'].astype(str) == str(summary_wf)) &
+                            (product_in_progress_pivoted['产品规格'].astype(str) == str(summary_spec)) &
+                            (product_in_progress_pivoted['产品品名'].astype(str) == str(summary_prod))
                         ]
                 
-                        if not semi_row.empty:
-                            semi_finished_value = semi_row[numeric_cols].sum(axis=1).values[0]
+                        finished_value = match[numeric_cols].sum(axis=1).values[0] if not match.empty else 0
                 
-                            # ✅ 写入新旧料号 sheet 的半成品列
-                            mapping_sheet = writer.sheets['赛卓-新旧料号']
-                            for row_idx in range(3, mapping_sheet.max_row + 1):  # Excel 从第3行开始是数据行
-                                sheet_new_spec = mapping_sheet.cell(row=row_idx, column=4).value  # 新规格
-                                sheet_new_name = mapping_sheet.cell(row=row_idx, column=5).value  # 新品名
-                                sheet_new_wf = mapping_sheet.cell(row=row_idx, column=6).value    # 新晶圆品名
+                        # 去 mapping 里找半成品替换
+                        semi_match = mapping_df[
+                            (mapping_df['新晶圆品名'].astype(str) == str(summary_wf)) &
+                            (mapping_df['新规格'].astype(str) == str(summary_spec)) &
+                            (mapping_df['半成品'].astype(str) == str(summary_prod))
+                        ]
                 
-                                if (str(sheet_new_spec) == str(semi_spec) and
-                                    str(sheet_new_name) == str(semi_prod) and
-                                    str(sheet_new_wf) == str(semi_wafer)):
+                        semi_finished_value = 0
+                        if not semi_match.empty:
+                            semi_wafer = semi_match['新晶圆品名'].values[0]
+                            semi_spec = semi_match['新规格'].values[0]
+                            semi_prod = semi_match['新品名'].values[0]
                 
-                                    # 找到“半成品”列位置（第9列）
-                                    mapping_sheet.cell(row=row_idx, column=9, value=semi_finished_value)
-                
-                                    # 标红整行
-                                    red_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-                                    for col_idx in range(1, 10):  # 总共9列
-                                        mapping_sheet.cell(row=row_idx, column=col_idx).fill = red_fill
-                                    break  # 找到后就退出循环
+                            semi_row = product_in_progress_pivoted[
+                                (product_in_progress_pivoted['晶圆型号'].astype(str) == str(semi_wafer)) &
+                                (product_in_progress_pivoted['产品规格'].astype(str) == str(semi_spec)) &
+                                (product_in_progress_pivoted['产品品名'].astype(str) == str(semi_prod))
+                            ]
+                            semi_finished_value = semi_row[numeric_cols].sum(axis=1).values[0] if not semi_row.empty else 0
 
+                        st.write(f"半成品匹配行 semi_match：\n{semi_match}")
+                        st.write(f"半成品数量 semi_finished_value：{semi_finished_value}")
+                        # 写入到汇总表
+                        summary_sheet.cell(row=row_idx, column=start_col, value=finished_value)
+                        summary_sheet.cell(row=row_idx, column=start_col + 1, value=semi_finished_value)
                 
+                        # 标记成品匹配
+                        if not match.empty:
+                            product_in_progress_pivoted.loc[match.index, '已匹配'] = True
+                        if not semi_row.empty:
+                            product_in_progress_pivoted.loc[semi_row.index, '已匹配'] = True
+                
+                    # 在赛卓-成品在制 sheet 中标红未匹配行
+                    in_progress_sheet = writer.book['赛卓-成品在制']
+                    for row_idx, matched in enumerate(product_in_progress_pivoted['已匹配'], start=2):
+                        if not matched:
+                            for col_idx in range(1, len(product_in_progress_pivoted.columns) + 1):
+                                in_progress_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+
+
 
                 # 自动调整列宽
                 for idx, col in enumerate(worksheet.columns, 1):
