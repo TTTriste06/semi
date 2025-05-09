@@ -309,22 +309,25 @@ def main():
                 df_mapping = pd.read_excel(mapping_file, header = 1)
             else:
                 df_mapping = download_backup_file("mapping_file.xlsx")
-            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False, startrow=1)
-            adjust_column_width(writer, '赛卓-新旧料号', df_mapping)
+            # 保存 DataFrame 只写数据，不写 header，不写 index
+            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False, header=False, startrow=1)
             
+            # 获取 worksheet
             ws = writer.book['赛卓-新旧料号']
             
-            # 获取列字母范围
-            last_col_letter = get_column_letter(len(df_mapping.columns))
+            # 写入第二行（表头行）
+            for col_idx, col_name in enumerate(df_mapping.columns, start=1):
+                ws.cell(row=2, column=col_idx, value=col_name)
+                ws.cell(row=2, column=col_idx).alignment = Alignment(horizontal='center', vertical='center')
+                ws.cell(row=2, column=col_idx).font = Font(bold=True)
             
-            # 写入大类分组标题（第一行）
-            # A1~C1: 旧，D1~F1: 新，G1: 封装厂，H1: PC，I1: 半成品
+            # 合并 A1:C1、D1:F1
             ws.merge_cells('A1:C1')
             ws['A1'] = '旧'
             ws.merge_cells('D1:F1')
             ws['D1'] = '新'
             
-            # 设置颜色填充和居中
+            # 设置填充颜色和居中
             yellow_fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
             green_fill = PatternFill(start_color='00FF00', end_color='00FF00', fill_type='solid')
             
@@ -338,15 +341,11 @@ def main():
                 cell.alignment = Alignment(horizontal='center', vertical='center')
                 cell.font = Font(bold=True)
             
-            # 第二行表头加粗和居中（DataFrame 写入的 header 行）
-            for col_idx, col_name in enumerate(df_mapping.columns, start=1):
-                cell = ws.cell(row=2, column=col_idx)
-                cell.value = col_name  # 确保表头名字
-                cell.alignment = Alignment(horizontal='center', vertical='center')
-                cell.font = Font(bold=True)
-            
-            # 打开筛选器（启用 Excel 下拉箭头）
+            # 开启 Excel 筛选器（第二行是表头）
+            from openpyxl.utils import get_column_letter
+            last_col_letter = get_column_letter(len(df_mapping.columns))
             ws.auto_filter.ref = f"A2:{last_col_letter}2"
+
 
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
