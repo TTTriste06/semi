@@ -7,10 +7,7 @@ import hashlib
 from io import BytesIO
 from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
-from openpyxl.styles import Alignment
-from openpyxl.styles import PatternFill
-from openpyxl.styles import Border, Side
-from openpyxl.styles import Font
+from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
 
 
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
