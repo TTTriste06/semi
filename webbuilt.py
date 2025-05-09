@@ -627,10 +627,13 @@ def main():
                             (product_in_progress_pivoted['产品品名'].astype(str) == str(summary_prod))
                         ]
                 
-                        finished_value = match[numeric_cols].sum(axis=1).values[0] if not match.empty else 0
+                        finished_value = match[numeric_cols].sum(axis=1).values[0] if not match.empty else None
 
                         # 写入到汇总表
                         summary_sheet.cell(row=row_idx, column=start_col, value=finished_value)
+
+                        product_in_progress_pivoted.loc[match.index, '已匹配'] = True  # 成品部分
+
                     
                         ##半成品
                         # 筛选出半成品列有值的行（非 NaN 且非空字符串）
@@ -679,12 +682,8 @@ def main():
                         # 删除未交数据和为 0 的行
                         semi_result_df = semi_result_df[semi_result_df['未交数据和'] != 0].reset_index(drop=True)
 
-                        # 打印输出这个表
-                        st.write("✅ 半成品匹配到的成品在制未交汇总表:")
-                        st.dataframe(semi_result_df)
 
-                        # 可以手动事先写入，也可以在这里自动添加
-                        
+                        product_in_progress_pivoted.loc[semi_row.index, '已匹配_半成品'] = True  # 半成品部分
                         # 遍历 semi_result_df
                         for idx, row in semi_result_df.iterrows():
                             semi_spec = row['新规格']
@@ -715,10 +714,21 @@ def main():
                         if not semi_row.empty:
                             product_in_progress_pivoted.loc[semi_row.index, '已匹配'] = True
                 
-                    # 在赛卓-成品在制 sheet 中标红未匹配行
+                    # 检查 product_in_progress_pivoted 是否有这两列
+                    if '已匹配' not in product_in_progress_pivoted.columns:
+                        product_in_progress_pivoted['已匹配'] = False
+                    if '已匹配_半成品' not in product_in_progress_pivoted.columns:
+                        product_in_progress_pivoted['已匹配_半成品'] = False
+                    
+                    # 获取对应 worksheet
                     in_progress_sheet = writer.book['赛卓-成品在制']
-                    for row_idx, matched in enumerate(product_in_progress_pivoted['已匹配'], start=2):
-                        if not matched:
+                    
+                    # 遍历行
+                    for row_idx, (matched_prod, matched_semi) in enumerate(zip(
+                        product_in_progress_pivoted['已匹配'],
+                        product_in_progress_pivoted['已匹配_半成品']
+                    ), start=2):  # Excel 从第2行开始（假设第1行为表头）
+                        if not matched_prod and not matched_semi:
                             for col_idx in range(1, len(product_in_progress_pivoted.columns) + 1):
                                 in_progress_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
