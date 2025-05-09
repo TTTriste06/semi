@@ -315,7 +315,7 @@ def main():
             
             # 获取 worksheet
             ws = writer.book['赛卓-新旧料号']
-            ws.delete_rows(1)
+            ws.delete_rows(0)
 
             # 写入第2行表头（DataFrame 的列名）
             for col_idx, col_name in enumerate(df_mapping.columns, start=1):
@@ -346,6 +346,22 @@ def main():
             from openpyxl.utils import get_column_letter
             last_col_letter = get_column_letter(len(df_mapping.columns))
             ws.auto_filter.ref = f"A2:{last_col_letter}2"
+
+            for col in ws.columns:
+                max_length = 0
+                column = col[0].column_letter  # 获取列字母，比如 'A'
+                for cell in col:
+                    try:
+                        if cell.value:
+                            # 中文字符宽度大约 ×2
+                            cell_len = sum(2 if ord(char) > 127 else 1 for char in str(cell.value))
+                            if cell_len > max_length:
+                                max_length = cell_len
+                    except:
+                        pass
+                adjusted_width = max_length + 2  # 额外加一点空隙
+                ws.column_dimensions[column].width = adjusted_width
+
 
         
 
