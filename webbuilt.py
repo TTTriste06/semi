@@ -240,20 +240,19 @@ def safe_preprocess_mapping_file(mapping_df):
 
 
 def fill_finished_in_summary(finished_df, summary_df, mapping_df):
-    # 预处理 mapping_df，只在后台改列名
-    mapping_df = preprocess_mapping(mapping_df)
+    if mapping_df is None or mapping_df.empty:
+        print("⚠️ mapping_df 为空，跳过成品在制匹配。")
+        return summary_df
 
-    # 确定 finished_df 数值列（假设前3列是key）
+    mapping_df = preprocess_mapping(mapping_df)
     value_cols = finished_df.columns[3:]
 
-    # 遍历每行
     for idx, row in finished_df.iterrows():
         wafer = row['晶圆型号']
         spec = row['产品规格']
         prod_name = row['产品品名']
         values = row[value_cols]
 
-        # 在汇总表中查找
         match_idx = summary_df[
             (summary_df['晶圆品名'] == wafer) &
             (summary_df['规格'] == spec) &
@@ -261,10 +260,8 @@ def fill_finished_in_summary(finished_df, summary_df, mapping_df):
         ].index
 
         if not match_idx.empty:
-            # 直接填入空白列
             summary_df.loc[match_idx, summary_df.columns[-len(value_cols):]] = values.values
         else:
-            # 去 mapping_df 查找旧 → 新
             map_match = mapping_df[
                 (mapping_df['旧晶圆品名'] == wafer) &
                 (mapping_df['旧规格'] == spec) &
@@ -283,6 +280,7 @@ def fill_finished_in_summary(finished_df, summary_df, mapping_df):
                     summary_df.loc[new_idx, summary_df.columns[-len(value_cols):]] = values.values
 
     return summary_df
+
 
 
 def main():
