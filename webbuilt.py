@@ -638,10 +638,46 @@ def main():
                         
                         # 提取四列信息
                         semi_info_table = semi_rows[['新规格', '新品名', '新晶圆品名', '半成品']].copy()
+
+                        # 数值列（未交数据列）
+                        numeric_cols = product_in_progress_pivoted.select_dtypes(include='number').columns.tolist()
+
+                        # 新表，用来存放匹配结果
+                        semi_result_list = []
+                        
+                        # 遍历 semi_info_table 里的每一行去匹配
+                        for idx, row in semi_info_table.iterrows():
+                            semi_spec = row['新规格']
+                            semi_wafer = row['新晶圆品名']
+                            semi_prod = row['半成品']
+                            new_prod_name = row['新品名']
+                        
+                            # 在成品在制表里匹配对应行
+                            match_rows = product_in_progress_pivoted[
+                                (product_in_progress_pivoted['产品规格'].astype(str) == str(semi_spec)) &
+                                (product_in_progress_pivoted['晶圆型号'].astype(str) == str(semi_wafer)) &
+                                (product_in_progress_pivoted['产品品名'].astype(str) == str(semi_prod))
+                            ]
+                        
+                            # 计算未交数据的和
+                            pending_sum = match_rows[numeric_cols].sum().sum() if not match_rows.empty else 0
+                        
+                            # 保存到结果列表
+                            semi_result_list.append({
+                                '新规格': semi_spec,
+                                '新品名': new_prod_name,
+                                '新晶圆品名': semi_wafer,
+                                '未交数据和': pending_sum
+                            })
+                        
+                        # 转为 DataFrame
+                        semi_result_df = pd.DataFrame(semi_result_list)
                         
                         # 打印输出这个表
-                        st.write("✅ 半成品列有值的行（提取四列信息）:")
-                        st.dataframe(semi_info_table)
+                        st.write("✅ 半成品匹配到的成品在制未交汇总表:")
+                        st.dataframe(semi_result_df)
+
+
 
 
                         # 写入到汇总表
