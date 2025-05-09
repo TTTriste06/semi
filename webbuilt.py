@@ -578,6 +578,8 @@ def main():
                                     inventory_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
                 ### 成品在制
+                semi_finished_value = 0
+                semi_row = pd.DataFrame()  # ✅ 先定义为空 DataFrame
                 # 先检查 mapping_df 是否存在
                 if mapping_df is not None:
                     st.write("📦 mapping_df 当前内容：")
