@@ -187,8 +187,15 @@ def create_pivot(df, config, filename, mapping_df=None):
     pivoted.columns = [f"{col[0]}_{col[1]}" if isinstance(col, tuple) else col for col in pivoted.columns]
     pivoted = pivoted.reset_index()
 
-    if mapping_df is not None and filename == "赛卓-未交订单.xlsx":
-        pivoted = apply_mapping_and_merge(pivoted, mapping_df)
+    if mapping_df is not None and filename in [
+        "赛卓-未交订单.xlsx", 
+        "赛卓-安全库存.xlsx", 
+        "赛卓-预测.xlsx", 
+        "赛卓-成品库存.xlsx", 
+        "赛卓-成品在制.xlsx"
+    ]:
+        df = apply_mapping_and_merge(df, mapping_df)
+
 
     if CONFIG['selected_month'] and filename == "赛卓-未交订单.xlsx":
         history_cols = [col for col in pivoted.columns if '_' in col and col.split('_')[-1][:4].isdigit() and col.split('_')[-1] < CONFIG['selected_month']]
@@ -291,6 +298,8 @@ def main():
                 df_safety = pd.read_excel(safety_file)
             else:
                 df_safety = download_backup_file("safety_file.xlsx")
+            if mapping_df is not None:
+                df_safety = apply_mapping_and_merge(df_safety, mapping_df)
             df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
             adjust_column_width(writer, '赛卓-安全库存', df_safety)
 
@@ -299,7 +308,10 @@ def main():
                 df_pred = pd.read_excel(pred_file)
             else:
                 df_pred = download_backup_file("pred_file.xlsx")
+            if mapping_df is not None:
+                df_pred = apply_mapping_and_merge(df_pred, mapping_df)
             df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
+
             adjust_column_width(writer, '赛卓-预测', df_pred)
 
             # 写入新旧料号文件 sheet
