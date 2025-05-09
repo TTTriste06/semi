@@ -697,7 +697,7 @@ def main():
                             semi_info_table.at[idx, '是否在汇总匹配'] = 1 if found else 0
                         
                         # 打印最终的 semi_info_table
-                        print(semi_info_table)
+                        st.write(semi_info_table)
 
 
 
