@@ -370,7 +370,16 @@ def main():
             from openpyxl.utils import get_column_letter
             last_col_letter = get_column_letter(len(df_mapping.columns))
             ws.auto_filter.ref = f"A2:{last_col_letter}2"
+
+            # 定义新的列名
+            new_column_names = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
             
+            # 直接重命名第二行每一列
+            for col_idx, col_name in enumerate(new_column_names, start=1):
+                ws.cell(row=2, column=col_idx, value=col_name)
+                ws.cell(row=2, column=col_idx).alignment = Alignment(horizontal='center', vertical='center')
+                ws.cell(row=2, column=col_idx).font = Font(bold=True)
+                
             # 自动调整列宽
             for idx, col in enumerate(ws.columns, 1):
                 col_letter = get_column_letter(idx)
