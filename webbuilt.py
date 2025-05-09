@@ -643,7 +643,6 @@ def main():
                     unmatched_rows.append(idx + 2)  # Excel 的行号（带表头）
                 
                 # 最后统一标红未匹配行
-                from openpyxl.styles import PatternFill
                 red_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
                 
                 for row_idx in unmatched_rows:
