@@ -579,6 +579,16 @@ def main():
 
                 ### 成品在制
                 # === 从生成的赛卓-成品在制中提取信息，写入汇总 sheet ===
+                expected_columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
+
+                # 重命名现有列
+                mapping_df.columns = expected_columns[:mapping_df.shape[1]]
+                
+                # 补充缺失列
+                for col in expected_columns:
+                    if col not in mapping_df.columns:
+                        mapping_df[col] = None
+        
                 product_in_progress_pivoted = None
                 for f in uploaded_files:
                     if f.name == "赛卓-成品在制.xlsx":
