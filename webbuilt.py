@@ -248,7 +248,7 @@ def fill_finished_in_summary(finished_df, summary_df, mapping_df):
         print("⚠️ mapping_df 为空，跳过成品在制匹配。")
         return summary_df
 
-    mapping_df = preprocess_mapping(mapping_df)
+    mapping_df = preprocess_mapping_file(mapping_df)
     value_cols = finished_df.columns[3:]
 
     for idx, row in finished_df.iterrows():
