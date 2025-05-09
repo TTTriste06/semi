@@ -10,6 +10,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment
 from openpyxl.styles import PatternFill
 from openpyxl.styles import Border, Side
+from openpyxl.styles import Font
 
 
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
@@ -308,8 +309,44 @@ def main():
                 df_mapping = pd.read_excel(mapping_file, header = 1)
             else:
                 df_mapping = download_backup_file("mapping_file.xlsx")
-            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False)
+            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False, startrow=2)
             adjust_column_width(writer, '赛卓-新旧料号', df_mapping)
+            
+            ws = writer.book['赛卓-新旧料号']
+            
+            # 获取列字母范围
+            last_col_letter = get_column_letter(len(df_mapping.columns))
+            
+            # 写入大类分组标题（第一行）
+            # A1~C1: 旧，D1~F1: 新，G1: 封装厂，H1: PC，I1: 半成品
+            ws.merge_cells('A1:C1')
+            ws['A1'] = '旧'
+            ws.merge_cells('D1:F1')
+            ws['D1'] = '新'
+            
+            # 设置颜色填充和居中
+            yellow_fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
+            green_fill = PatternFill(start_color='00FF00', end_color='00FF00', fill_type='solid')
+            
+            for cell in ['A1', 'B1', 'C1']:
+                ws[cell].fill = yellow_fill
+            for cell in ['D1', 'E1', 'F1']:
+                ws[cell].fill = green_fill
+            
+            for col in range(1, len(df_mapping.columns) + 1):
+                cell = ws.cell(row=1, column=col)
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                cell.font = Font(bold=True)
+            
+            # 第二行表头加粗和居中（DataFrame 写入的 header 行）
+            for col_idx, col_name in enumerate(df_mapping.columns, start=1):
+                cell = ws.cell(row=2, column=col_idx)
+                cell.value = col_name  # 确保表头名字
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                cell.font = Font(bold=True)
+            
+            # 打开筛选器（启用 Excel 下拉箭头）
+            ws.auto_filter.ref = f"A2:{last_col_letter}2"
 
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
