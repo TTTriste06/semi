@@ -88,8 +88,10 @@ def upload_to_github(file, path_in_repo, commit_message):
 
 
 def preprocess_mapping_file(df):
-    expected_cols = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
-    df.columns = expected_cols[:df.shape[1]]
+    # 只取前6列
+    df = df.iloc[:, :6]
+    # 重命名列
+    df.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名']
     return df
 
 
@@ -300,6 +302,17 @@ def main():
             df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
             adjust_column_width(writer, '赛卓-预测', df_pred)
 
+            # 写入新旧料号文件 sheet
+            # === 在处理成品在制之前，重新加载 mapping_file 全表 ===
+            if mapping_file:
+                df_full_mapping = pd.read_excel(mapping_file)
+                
+                # 设置列名（假设 Excel 里有9列，含封装厂、PC、半成品）
+                df_full_mapping.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
+            else:
+                df_full_mapping = download_backup_file("mapping_file.xlsx")
+                df_full_mapping.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
+            
             # 写入新旧料号文件 sheet
             if mapping_file:
                 df_mapping = pd.read_excel(mapping_file, header = 1)
@@ -631,12 +644,12 @@ def main():
                         st.write(mapping_df['半成品'])
 
                         # 去 mapping 里找半成品替换
-                        semi_match = mapping_df[
-                            (mapping_df['新晶圆品名'].astype(str) == str(summary_wf)) &
-                            (mapping_df['新规格'].astype(str) == str(summary_spec)) &
-                            (mapping_df['半成品'].astype(str) == str(summary_prod))
+                        semi_match = df_full_mapping[
+                            (df_full_mapping['新晶圆品名'].astype(str) == str(summary_wf)) &
+                            (df_full_mapping['新规格'].astype(str) == str(summary_spec)) &
+                            (df_full_mapping['半成品'].astype(str) == str(summary_prod))
                         ]
-                
+
                         semi_finished_value = 0
                         if not semi_match.empty:
                             semi_wafer = semi_match['新晶圆品名'].values[0]
