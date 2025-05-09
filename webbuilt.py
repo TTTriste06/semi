@@ -636,34 +636,24 @@ def main():
                             (df_full_mapping['半成品'].notnull()) &
                             (df_full_mapping['半成品'].astype(str) != '')
                         ]
-
-                        st.write(semi_match)
-                        semi_finished_value = 0
                         
-                        # 打印当前 summary 行信息
-                        st.write(f"🔍 汇总表当前行 → 晶圆品名: {summary_wf}, 规格: {summary_spec}, 品名: {summary_prod}")
+                        semi_finished_value = 0
                         
                         if not semi_match.empty:
                             semi_wafer = semi_match['新晶圆品名'].values[0]
                             semi_spec = semi_match['新规格'].values[0]
                             semi_prod = semi_match['新品名'].values[0]
                         
-                            # 打印 mapping 表匹配到的半成品 key
-                            st.write(f"✅ Mapping 匹配到半成品 → 晶圆型号: {semi_wafer}, 产品规格: {semi_spec}, 产品品名: {semi_prod}")
-                        
                             semi_row = product_in_progress_pivoted[
                                 (product_in_progress_pivoted['晶圆型号'].astype(str) == str(semi_wafer)) &
                                 (product_in_progress_pivoted['产品规格'].astype(str) == str(semi_spec)) &
                                 (product_in_progress_pivoted['产品品名'].astype(str) == str(semi_prod))
                             ]
-                        
-                            semi_finished_value = semi_row[numeric_cols].sum(axis=1).values[0] if not semi_row.empty else 0
-                        
-                            # 打印找到的半成品数量
-                            st.write(f"📦 半成品未交量: {semi_finished_value}")
-                        else:
-                            st.write("⚠️ Mapping 中没有匹配到半成品（或半成品列为空），跳过。")
                             
+                            semi_finished_value = semi_row[numeric_cols].sum(axis=1).values[0] if not semi_row.empty else 0
+
+                        st.write(semi_finished_value)
+                        
                         # 写入到汇总表
                         summary_sheet.cell(row=row_idx, column=start_col, value=finished_value)
                         summary_sheet.cell(row=row_idx, column=start_col + 1, value=semi_finished_value)
