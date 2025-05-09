@@ -700,45 +700,7 @@ def main():
 
 
                         # === 第一步：标记成品未匹配行为 True ===
-                        product_in_progress_pivoted['需要标红'] = True  # 先默认全部标红
                         
-                        for row_idx in range(3, summary_sheet.max_row + 1):
-                            summary_wf = summary_sheet.cell(row=row_idx, column=1).value
-                            summary_spec = summary_sheet.cell(row=row_idx, column=2).value
-                            summary_prod = summary_sheet.cell(row=row_idx, column=3).value
-                        
-                            match_indices = product_in_progress_pivoted[
-                                (product_in_progress_pivoted['晶圆型号'].astype(str) == str(summary_wf)) &
-                                (product_in_progress_pivoted['产品规格'].astype(str) == str(summary_spec)) &
-                                (product_in_progress_pivoted['产品品名'].astype(str) == str(summary_prod))
-                            ].index
-                        
-                            if not match_indices.empty:
-                                product_in_progress_pivoted.loc[match_indices, '需要标红'] = False  # 成品用到了，不标红
-                        
-                        # === 第二步：根据半成品匹配取消标红 ===
-                        for idx, row in semi_info_table[semi_info_table['是否在汇总匹配'] == 1].iterrows():
-                            semi_spec = row['新规格']
-                            semi_wafer = row['新晶圆品名']
-                            semi_prod = row['半成品']
-                        
-                            match_indices = product_in_progress_pivoted[
-                                (product_in_progress_pivoted['产品规格'].astype(str) == str(semi_spec)) &
-                                (product_in_progress_pivoted['晶圆型号'].astype(str) == str(semi_wafer)) &
-                                (product_in_progress_pivoted['产品品名'].astype(str) == str(semi_prod))
-                            ].index
-                        
-                            if not match_indices.empty:
-                                product_in_progress_pivoted.loc[match_indices, '需要标红'] = False  # 半成品用到了，不标红
-                        
-                        # === 第三步：对需要标红的行进行 Excel 标红 ===
-                        progress_sheet = writer.book['赛卓-成品在制']
-                        for row_idx, row in product_in_progress_pivoted.iterrows():
-                            excel_row_idx = row_idx + 2  # DataFrame index → Excel 行号
-                            if row['需要标红']:
-                                for col_idx in range(1, len(product_in_progress_pivoted.columns) + 1):
-                                    progress_sheet.cell(row=excel_row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-
                 
                 # 自动调整列宽
                 for idx, col in enumerate(worksheet.columns, 1):
