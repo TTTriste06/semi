@@ -125,10 +125,6 @@ def download_excel_from_github(url, token=None):
 
     return pd.read_excel(BytesIO(response.content))
 
-import pandas as pd
-import requests
-from io import BytesIO
-
 def download_backup_file(file_name):
     api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{file_name}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
@@ -228,7 +224,7 @@ def add_black_border(ws, row_count, col_count):
         for cell in row:
             cell.border = border
 
-def preprocess_mapping_file(df):
+def preprocess_mapping(df):
     df = df.iloc[:, :9]  # 保留前9列
     df.columns = ['旧规格', '旧品名', '旧晶圆品名',
                   '新规格', '新品名', '新晶圆品名',
@@ -241,6 +237,52 @@ def safe_preprocess_mapping_file(mapping_df):
     if list(mapping_df.columns[:9]) != expected_cols:
         mapping_df = preprocess_mapping_file(mapping_df)
     return mapping_df
+
+
+def fill_finished_in_summary(finished_df, summary_df, mapping_df):
+    # 预处理 mapping_df，只在后台改列名
+    mapping_df = preprocess_mapping(mapping_df)
+
+    # 确定 finished_df 数值列（假设前3列是key）
+    value_cols = finished_df.columns[3:]
+
+    # 遍历每行
+    for idx, row in finished_df.iterrows():
+        wafer = row['晶圆型号']
+        spec = row['产品规格']
+        prod_name = row['产品品名']
+        values = row[value_cols]
+
+        # 在汇总表中查找
+        match_idx = summary_df[
+            (summary_df['晶圆品名'] == wafer) &
+            (summary_df['规格'] == spec) &
+            (summary_df['品名'] == prod_name)
+        ].index
+
+        if not match_idx.empty:
+            # 直接填入空白列
+            summary_df.loc[match_idx, summary_df.columns[-len(value_cols):]] = values.values
+        else:
+            # 去 mapping_df 查找旧 → 新
+            map_match = mapping_df[
+                (mapping_df['旧晶圆品名'] == wafer) &
+                (mapping_df['旧规格'] == spec) &
+                (mapping_df['半成品'] == prod_name)
+            ]
+            if not map_match.empty:
+                new_wafer = map_match['新晶圆品名'].values[0]
+                new_prod = map_match['新品名'].values[0]
+                new_idx = summary_df[
+                    (summary_df['晶圆品名'] == new_wafer) &
+                    (summary_df['规格'] == spec) &
+                    (summary_df['品名'] == new_prod)
+                ].index
+
+                if not new_idx.empty:
+                    summary_df.loc[new_idx, summary_df.columns[-len(value_cols):]] = values.values
+
+    return summary_df
 
 
 def main():
@@ -321,8 +363,6 @@ def main():
                 df_pred = download_backup_file("pred_file.xlsx")
             df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
             adjust_column_width(writer, '赛卓-预测', df_pred)
-
-
 
             # 写入新旧料号文件 sheet
             if mapping_file:
@@ -541,57 +581,26 @@ def main():
                                 for col_idx in range(1, len(product_inventory_pivoted.columns) + 1):
                                     inventory_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
+                ### 成品在制
+                finished_df = None
+                for f in uploaded_files:
+                    if f.name == "赛卓-成品在制.xlsx":
+                        finished_df = pd.read_excel(f)
+                        break
+                
+                if finished_df is not None:
+                    num_extra_cols = finished_df.shape[1] - 3
+                    for i in range(num_extra_cols):
+                        unfulfilled_orders_summary[f'成品在制_{i+1}'] = None
+                
+                    unfulfilled_orders_summary = fill_finished_in_summary(
+                        finished_df, 
+                        unfulfilled_orders_summary, 
+                        mapping_df
+                    )
 
 
 
-                ###成品在制
-                # === 成品在制 ===
-                product_in_progress_df = None
-                if product_in_progress_df is not None:
-                    required_columns = ['晶圆型号', '产品规格', '产品品名']
-                    month_cols = [col for col in product_in_progress_df.columns if col.startswith('未交_') or col.startswith('未交')]
-            
-                    start_col = summary_sheet.max_column + 1
-                    summary_sheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=start_col + 1)
-                    summary_sheet.cell(row=1, column=start_col, value='成品在制').alignment = Alignment(horizontal='center', vertical='center')
-                    summary_sheet.cell(row=2, column=start_col, value='成品').alignment = Alignment(horizontal='center', vertical='center')
-                    summary_sheet.cell(row=2, column=start_col + 1, value='半成品').alignment = Alignment(horizontal='center', vertical='center')
-            
-                    for row_idx in range(3, summary_sheet.max_row + 1):
-                        summary_wf = summary_sheet.cell(row=row_idx, column=1).value
-                        summary_spec = summary_sheet.cell(row=row_idx, column=2).value
-                        summary_prod = summary_sheet.cell(row=row_idx, column=3).value
-            
-                        match = product_in_progress_df[
-                            (product_in_progress_df['晶圆型号'].astype(str) == str(summary_wf)) &
-                            (product_in_progress_df['产品规格'].astype(str) == str(summary_spec)) &
-                            (product_in_progress_df['产品品名'].astype(str) == str(summary_prod))
-                        ]
-                        prod_sum = match[month_cols].sum(axis=1).values[0] if not match.empty else 0
-            
-                        semi_sum = 0
-                        if mapping_df is not None and not mapping_df.empty:
-                            expected_cols = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
-                            if list(mapping_df.columns[:9]) != expected_cols:
-                                mapping_df = preprocess_mapping_file(mapping_df)
-                            semi_name = mapping_df[
-                                (mapping_df['新晶圆品名'].astype(str) == str(summary_wf)) &
-                                (mapping_df['新规格'].astype(str) == str(summary_spec)) &
-                                (mapping_df['新品名'].astype(str) == str(summary_prod))
-                            ]['半成品'].dropna()
-            
-                            if not semi_name.empty:
-                                semi_prod_name = semi_name.values[0]
-                                match_semi = product_in_progress_df[
-                                    (product_in_progress_df['晶圆型号'].astype(str) == str(summary_wf)) &
-                                    (product_in_progress_df['产品规格'].astype(str) == str(summary_spec)) &
-                                    (product_in_progress_df['产品品名'].astype(str) == str(semi_prod_name))
-                                ]
-                                semi_sum = match_semi[month_cols].sum(axis=1).values[0] if not match_semi.empty else 0
-            
-                        summary_sheet.cell(row=row_idx, column=start_col, value=prod_sum)
-                        summary_sheet.cell(row=row_idx, column=start_col + 1, value=semi_sum)
-            
 
                 # 自动调整列宽
                 for idx, col in enumerate(worksheet.columns, 1):
