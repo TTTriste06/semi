@@ -636,7 +636,10 @@ def main():
                         ]
                 
                         finished_value = match[numeric_cols].sum(axis=1).values[0] if not match.empty else 0
-                
+
+                        st.write("mapping_df['半成品'] 内容：")
+                        st.write(mapping_df['半成品'])
+
                         # 去 mapping 里找半成品替换
                         semi_match = mapping_df[
                             (mapping_df['新晶圆品名'].astype(str) == str(summary_wf)) &
