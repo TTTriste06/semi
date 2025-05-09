@@ -292,8 +292,7 @@ def main():
                 df_safety = pd.read_excel(safety_file)
             else:
                 df_safety = download_backup_file("safety_file.xlsx")
-            if mapping_df is not None:
-                df_safety = apply_mapping_and_merge(df_safety, mapping_df)
+            df_safety = apply_mapping_and_merge(df_safety, mapping_df)
             df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
             adjust_column_width(writer, '赛卓-安全库存', df_safety)
 
@@ -302,8 +301,6 @@ def main():
                 df_pred = pd.read_excel(pred_file)
             else:
                 df_pred = download_backup_file("pred_file.xlsx")
-            if mapping_df is not None:
-                df_pred = apply_mapping_and_merge(df_pred, mapping_df)
             df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
 
             adjust_column_width(writer, '赛卓-预测', df_pred)
