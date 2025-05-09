@@ -640,8 +640,8 @@ def main():
                 
                         finished_value = match[numeric_cols].sum(axis=1).values[0] if not match.empty else 0
 
-                        st.write("mapping_df['半成品'] 内容：")
-                        st.write(mapping_df['半成品'])
+                        st.write("df_full_mapping['半成品'] 内容：")
+                        st.write(df_full_mapping['半成品'])
 
                         # 去 mapping 里找半成品替换
                         semi_match = df_full_mapping[
