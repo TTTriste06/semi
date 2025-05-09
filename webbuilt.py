@@ -361,7 +361,7 @@ def main():
             # 开启 Excel 筛选器（第2行是表头）
             from openpyxl.utils import get_column_letter
             last_col_letter = get_column_letter(len(df_mapping.columns))
-            ws.auto_filter.ref = f"A2:{last_col_letter}
+            ws.auto_filter.ref = f"A2:{last_col_letter}2"
 
             adjust_column_width(ws)
 
