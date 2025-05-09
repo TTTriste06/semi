@@ -272,9 +272,14 @@ def main():
 
                 df = pd.read_excel(f)
                 config = CONFIG['pivot_config'][filename]
-
+                
+                # ✅ 统一新旧料号替换（所有 sheet 都做）
+                if mapping_df is not None and all(col in df.columns for col in ['晶圆品名', '规格', '品名']):
+                    df = apply_mapping_and_merge(df, mapping_df)
+                
                 if 'date_format' in config and config['columns'] in df.columns:
                     df = process_date_column(df, config['columns'], config['date_format'])
+
 
                 pivoted = create_pivot(df, config, filename, mapping_df)
                 sheet_name = filename[:30].rstrip('.xlsx')
