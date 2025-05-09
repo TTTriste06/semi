@@ -88,11 +88,10 @@ def upload_to_github(file, path_in_repo, commit_message):
 
 
 def preprocess_mapping_file(df):
-    # 只取前6列
-    df = df.iloc[:, :6]
-    # 重命名列
-    df.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名']
+    expected_cols = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
+    df.columns = expected_cols[:df.shape[1]]
     return df
+
 
 def download_mapping_from_github(path_in_repo):
     api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{path_in_repo}"
