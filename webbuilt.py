@@ -11,7 +11,6 @@ from openpyxl.styles import Alignment
 from openpyxl.styles import PatternFill
 from openpyxl.styles import Border, Side
 from openpyxl.styles import Font
-from openpyxl import load_workbook
 
 
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
