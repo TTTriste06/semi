@@ -644,15 +644,26 @@ def main():
                             semi_spec = semi_match['新规格'].values[0]
                             semi_prod = semi_match['新品名'].values[0]
                         
+                            # 打印 mapping 表匹配到的半成品 key
+                            st.write(f"✅ Mapping 匹配到半成品 → 晶圆型号: {semi_wafer}, 产品规格: {semi_spec}, 产品品名: {semi_prod}")
+                        
                             semi_row = product_in_progress_pivoted[
                                 (product_in_progress_pivoted['晶圆型号'].astype(str) == str(semi_wafer)) &
                                 (product_in_progress_pivoted['产品规格'].astype(str) == str(semi_spec)) &
                                 (product_in_progress_pivoted['产品品名'].astype(str) == str(semi_prod))
                             ]
-                            
-                            semi_finished_value = semi_row[numeric_cols].sum(axis=1).values[0] if not semi_row.empty else 0
+                        
+                            if not semi_row.empty:
+                                semi_finished_value = semi_row[numeric_cols].sum(axis=1).values[0]
+                        
+                                # 打印成品 → 在成品在制里找到了半成品对应行的提示
+                                st.write(f"🎯 成品 → 在成品在制里找到了半成品行 → 成品: {summary_wf}, {summary_spec}, {summary_prod} | 半成品: {semi_wafer}, {semi_spec}, {semi_prod}")
+                            else:
+                                semi_finished_value = 0
+                        
+                                # 打印成品 → 没找到半成品对应行的提示
+                                st.write(f"⚠️ 成品 → 没在成品在制里找到半成品行 → 成品: {summary_wf}, {summary_spec}, {summary_prod} | 半成品: {semi_wafer}, {semi_spec}, {semi_prod}")
 
-                        st.write(semi_finished_value)
                         
                         # 写入到汇总表
                         summary_sheet.cell(row=row_idx, column=start_col, value=finished_value)
