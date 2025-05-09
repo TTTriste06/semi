@@ -292,7 +292,6 @@ def main():
                 df_safety = pd.read_excel(safety_file)
             else:
                 df_safety = download_backup_file("safety_file.xlsx")
-            df_safety = apply_mapping_and_merge(df_safety, mapping_df)
             df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
             adjust_column_width(writer, '赛卓-安全库存', df_safety)
 
@@ -302,7 +301,6 @@ def main():
             else:
                 df_pred = download_backup_file("pred_file.xlsx")
             df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
-
             adjust_column_width(writer, '赛卓-预测', df_pred)
 
             # 写入新旧料号文件 sheet
