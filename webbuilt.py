@@ -187,14 +187,8 @@ def create_pivot(df, config, filename, mapping_df=None):
     pivoted.columns = [f"{col[0]}_{col[1]}" if isinstance(col, tuple) else col for col in pivoted.columns]
     pivoted = pivoted.reset_index()
 
-    if mapping_df is not None and filename in [
-        "赛卓-未交订单.xlsx", 
-        "赛卓-安全库存.xlsx", 
-        "赛卓-预测.xlsx", 
-        "赛卓-成品库存.xlsx", 
-        "赛卓-成品在制.xlsx"
-    ]:
-        df = apply_mapping_and_merge(df, mapping_df)
+    if mapping_df is not None and filename == "赛卓-未交订单.xlsx":
+        pivoted = apply_mapping_and_merge(pivoted, mapping_df)
 
 
     if CONFIG['selected_month'] and filename == "赛卓-未交订单.xlsx":
