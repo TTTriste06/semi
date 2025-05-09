@@ -603,9 +603,11 @@ def main():
                         start_col = summary_sheet.max_column + 1
                 
                         # 合并第一行写“成品在制”
-                        summary_sheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=start_col)
+                        summary_sheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=start_col + 2)
                         summary_sheet.cell(row=1, column=start_col, value='成品在制').alignment = Alignment(horizontal='center', vertical='center')
                         summary_sheet.cell(row=2, column=start_col, value='未交合计').alignment = Alignment(horizontal='center', vertical='center')
+                        summary_sheet.cell(row=2, column=start_col + 1, value='成品未交').alignment = Alignment(horizontal='center', vertical='center')
+                        summary_sheet.cell(row=2, column=start_col + 2, value='半成品未交').alignment = Alignment(horizontal='center', vertical='center')
                 
                         # 遍历汇总表行（从第3行开始）
                         for row_idx in range(3, summary_sheet.max_row + 1):
@@ -621,7 +623,18 @@ def main():
                 
                             if not match.empty:
                                 total_unfulfilled = match[numeric_cols].sum(axis=1).values[0]
+                
+                                # 按列名关键词分成成品和半成品
+                                finished_cols = [col for col in numeric_cols if '成品' in col]
+                                semi_finished_cols = [col for col in numeric_cols if '半成品' in col]
+                
+                                finished_unfulfilled = match[finished_cols].sum(axis=1).values[0] if finished_cols else 0
+                                semi_finished_unfulfilled = match[semi_finished_cols].sum(axis=1).values[0] if semi_finished_cols else 0
+                
                                 summary_sheet.cell(row=row_idx, column=start_col, value=total_unfulfilled)
+                                summary_sheet.cell(row=row_idx, column=start_col + 1, value=finished_unfulfilled)
+                                summary_sheet.cell(row=row_idx, column=start_col + 2, value=semi_finished_unfulfilled)
+                
                                 product_in_progress_pivoted.loc[match.index, '已匹配'] = True
                 
                         # 在赛卓-成品在制 sheet 中标红未匹配行
@@ -630,7 +643,7 @@ def main():
                             if not matched:
                                 for col_idx in range(1, len(product_in_progress_pivoted.columns) + 1):
                                     in_progress_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-
+                
 
 
                 # 自动调整列宽
