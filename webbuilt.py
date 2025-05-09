@@ -629,6 +629,9 @@ def main():
                 
                         finished_value = match[numeric_cols].sum(axis=1).values[0] if not match.empty else 0
 
+                        # 写入到汇总表
+                        summary_sheet.cell(row=row_idx, column=start_col, value=finished_value)
+                    
                         ##半成品
                         # 筛选出半成品列有值的行（非 NaN 且非空字符串）
                         semi_rows = df_full_mapping[
@@ -672,17 +675,39 @@ def main():
                         
                         # 转为 DataFrame
                         semi_result_df = pd.DataFrame(semi_result_list)
-                        
+
+                        # 删除未交数据和为 0 的行
+                        semi_result_df = semi_result_df[semi_result_df['未交数据和'] != 0].reset_index(drop=True)
+
                         # 打印输出这个表
                         st.write("✅ 半成品匹配到的成品在制未交汇总表:")
                         st.dataframe(semi_result_df)
 
+                        # 可以手动事先写入，也可以在这里自动添加
+                        
+                        # 遍历 semi_result_df
+                        for idx, row in semi_result_df.iterrows():
+                            semi_spec = row['新规格']
+                            semi_wafer = row['新晶圆品名']
+                            semi_prod = row['新品名']
+                            pending_sum = row['未交数据和']
+                        
+                            # 遍历 summary_sheet 的第3行开始（假设第1行为大标题，第2行为表头）
+                            for row_idx in range(3, summary_sheet.max_row + 1):
+                                summary_wf = summary_sheet.cell(row=row_idx, column=1).value
+                                summary_spec = summary_sheet.cell(row=row_idx, column=2).value
+                                summary_prod = summary_sheet.cell(row=row_idx, column=3).value
+                        
+                                if str(summary_spec) == str(semi_spec) and str(summary_wf) == str(semi_wafer) and str(summary_prod) == str(semi_prod):
+                                    # 找到匹配行 → 在“半成品”列写入 pending_sum
+                                    # 先找到“半成品”列号（第2行表头）
+                                    for col_idx in range(1, summary_sheet.max_column + 1):
+                                        header = summary_sheet.cell(row=2, column=col_idx).value
+                                        if header == '半成品':
+                                            summary_sheet.cell(row=row_idx, column=col_idx, value=pending_sum)
+                                            break
 
 
-
-                        # 写入到汇总表
-                        summary_sheet.cell(row=row_idx, column=start_col, value=finished_value)
-                    
                 
                         # 标记成品匹配
                         if not match.empty:
