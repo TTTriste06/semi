@@ -581,6 +581,19 @@ def main():
                                     inventory_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
                 ### 成品在制
+                # 取出赛卓-成品在制.xlsx 文件对象
+                product_file = None
+                for f in uploaded_files:
+                    if f.name == "赛卓-成品在制.xlsx":
+                        product_file = f
+                        break
+                
+                if product_file:
+                    product_df = pd.read_excel(product_file)
+                else:
+                    st.warning("⚠️ 没有找到 赛卓-成品在制.xlsx 文件，跳过成品在制处理。")
+                    return  # 或者用 continue，根据你的流程决定
+
                 product_ws = writer.sheets['赛卓-成品在制']
                 summary_ws = writer.sheets['汇总']
                 mapping_ws = writer.sheets['赛卓-新旧料号']
