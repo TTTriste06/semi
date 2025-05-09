@@ -311,11 +311,12 @@ def main():
                 df_mapping = download_backup_file("mapping_file.xlsx")
            
             # 第3行开始写入数据（跳过第1、2行）
-            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False, header=False, startrow=1)
+            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False, header=False, startrow=2)
             
             # 获取 worksheet
             ws = writer.book['赛卓-新旧料号']
-            
+            ws.delete_rows(1)
+
             # 写入第2行表头（DataFrame 的列名）
             for col_idx, col_name in enumerate(df_mapping.columns, start=1):
                 ws.cell(row=2, column=col_idx, value=col_name)
@@ -327,9 +328,6 @@ def main():
             ws['A1'] = '旧'
             ws.merge_cells('D1:F1')
             ws['D1'] = '新'
-            ws['G2'] = '封装厂'
-            ws['H2'] = 'PC'
-            ws['I2'] = '半成品'
             
             # 设置第1行填充颜色、居中、加粗
             yellow_fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
