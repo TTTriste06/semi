@@ -309,7 +309,7 @@ def main():
                 df_mapping = pd.read_excel(mapping_file, header = 1)
             else:
                 df_mapping = download_backup_file("mapping_file.xlsx")
-            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False, startrow=2)
+            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False, startrow=1)
             adjust_column_width(writer, '赛卓-新旧料号', df_mapping)
             
             ws = writer.book['赛卓-新旧料号']
