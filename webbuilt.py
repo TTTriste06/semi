@@ -546,6 +546,7 @@ def main():
 
                 ###成品在制
                 # === 成品在制 ===
+                product_in_progress_df = None
                 if product_in_progress_df is not None:
                     required_columns = ['晶圆型号', '产品规格', '产品品名']
                     month_cols = [col for col in product_in_progress_df.columns if col.startswith('未交_') or col.startswith('未交')]
