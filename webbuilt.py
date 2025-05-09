@@ -696,8 +696,50 @@ def main():
                             # 在 semi_info_table 里记录是否匹配成功
                             semi_info_table.at[idx, '是否在汇总匹配'] = 1 if found else 0
                         
-                        # 打印最终的 semi_info_table
-                        st.write(semi_info_table)
+
+
+                        # 先为 product_in_progress_pivoted 标记“是否被成品用到”和“是否被半成品用到”
+                        product_in_progress_pivoted['成品已匹配'] = False
+                        product_in_progress_pivoted['半成品已匹配'] = False
+                        
+                        # === 标记成品已匹配 ===
+                        for row_idx in range(3, summary_sheet.max_row + 1):
+                            summary_wf = summary_sheet.cell(row=row_idx, column=1).value
+                            summary_spec = summary_sheet.cell(row=row_idx, column=2).value
+                            summary_prod = summary_sheet.cell(row=row_idx, column=3).value
+                        
+                            match = product_in_progress_pivoted[
+                                (product_in_progress_pivoted['晶圆型号'].astype(str) == str(summary_wf)) &
+                                (product_in_progress_pivoted['产品规格'].astype(str) == str(summary_spec)) &
+                                (product_in_progress_pivoted['产品品名'].astype(str) == str(summary_prod))
+                            ]
+                        
+                            if not match.empty:
+                                product_in_progress_pivoted.loc[match.index, '成品已匹配'] = True
+                        
+                        # === 标记半成品已匹配 ===
+                        for idx, row in semi_info_table[semi_info_table['是否在汇总匹配'] == 1].iterrows():
+                            semi_spec = row['新规格']
+                            semi_wafer = row['新晶圆品名']
+                            semi_prod = row['半成品']
+                        
+                            match = product_in_progress_pivoted[
+                                (product_in_progress_pivoted['产品规格'].astype(str) == str(semi_spec)) &
+                                (product_in_progress_pivoted['晶圆型号'].astype(str) == str(semi_wafer)) &
+                                (product_in_progress_pivoted['产品品名'].astype(str) == str(semi_prod))
+                            ]
+                        
+                            if not match.empty:
+                                product_in_progress_pivoted.loc[match.index, '半成品已匹配'] = True
+                        
+                        # === 标红既没有被成品用到，也没有被半成品用到的行 ===
+                        progress_sheet = writer.book['赛卓-成品在制']
+                        for row_idx, row in product_in_progress_pivoted.iterrows():
+                            excel_row_idx = row_idx + 2  # DataFrame index → Excel row index（假设第一行为表头）
+                            if not row['成品已匹配'] and not row['半成品已匹配']:
+                                for col_idx in range(1, len(product_in_progress_pivoted.columns) + 1):
+                                    progress_sheet.cell(row=excel_row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+                        
 
 
 
