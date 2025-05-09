@@ -311,7 +311,7 @@ def main():
                 df_mapping = download_backup_file("mapping_file.xlsx")
            
             # 第3行开始写入数据（跳过第1、2行）
-            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False, header=False, startrow=2)
+            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False, header=False, startrow=1)
             
             # 获取 worksheet
             ws = writer.book['赛卓-新旧料号']
