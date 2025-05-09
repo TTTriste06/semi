@@ -310,7 +310,7 @@ def main():
             else:
                 df_mapping = download_backup_file("mapping_file.xlsx")
             # 保存 DataFrame 只写数据，不写 header，不写 index
-            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False, header=False, startrow=1)
+            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False, startrow=0)
             
             # 获取 worksheet
             ws = writer.book['赛卓-新旧料号']
