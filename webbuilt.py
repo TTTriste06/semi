@@ -579,6 +579,15 @@ def main():
 
                 ### 成品在制
                 ## 获取 worksheet
+                # 找到赛卓-成品在制文件
+                product_file = next((f for f in uploaded_files if f.name == "赛卓-成品在制.xlsx"), None)
+                if product_file:
+                    product_df = pd.read_excel(product_file)
+                    # 后续的处理逻辑...
+                else:
+                    st.warning("⚠️ 未上传 赛卓-成品在制.xlsx，将跳过成品在制部分")
+                
+
                 product_ws = writer.sheets['赛卓-成品在制']
                 summary_ws = writer.sheets['汇总']
                 mapping_ws = writer.sheets['赛卓-新旧料号']
