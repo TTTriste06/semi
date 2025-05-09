@@ -578,6 +578,13 @@ def main():
                                     inventory_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
                 ### 成品在制
+                # 先检查 mapping_df 是否存在
+                if mapping_df is not None:
+                    st.write("📦 mapping_df 当前内容：")
+                    st.dataframe(mapping_df)
+                else:
+                    st.warning("⚠️ mapping_df 是 None，没有读取到任何内容。")
+    
                 # === 从生成的赛卓-成品在制中提取信息，写入汇总 sheet ===
                 expected_columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
 
