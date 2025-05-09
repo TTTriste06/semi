@@ -641,53 +641,43 @@ def main():
                         ]
                         
                         # 提取四列信息
+                        # 提取四列信息
                         semi_info_table = semi_rows[['新规格', '新品名', '新晶圆品名', '半成品']].copy()
-
+                        
                         # 数值列（未交数据列）
                         numeric_cols = product_in_progress_pivoted.select_dtypes(include='number').columns.tolist()
-
-                        # 新表，用来存放匹配结果
-                        semi_result_list = []
                         
-                        # 遍历 semi_info_table 里的每一行去匹配
+                        # 初始化“未交数据和”和“是否在汇总匹配”列
+                        semi_info_table['未交数据和'] = 0
+                        semi_info_table['是否在汇总匹配'] = 0
+                        
+                        # 遍历 semi_info_table，计算未交数据和
                         for idx, row in semi_info_table.iterrows():
                             semi_spec = row['新规格']
                             semi_wafer = row['新晶圆品名']
                             semi_prod = row['半成品']
-                            new_prod_name = row['新品名']
                         
-                            # 在成品在制表里匹配对应行
                             match_rows = product_in_progress_pivoted[
                                 (product_in_progress_pivoted['产品规格'].astype(str) == str(semi_spec)) &
                                 (product_in_progress_pivoted['晶圆型号'].astype(str) == str(semi_wafer)) &
                                 (product_in_progress_pivoted['产品品名'].astype(str) == str(semi_prod))
                             ]
                         
-                            # 计算未交数据的和
                             pending_sum = match_rows[numeric_cols].sum().sum() if not match_rows.empty else 0
+                            semi_info_table.at[idx, '未交数据和'] = pending_sum
                         
-                            # 保存到结果列表
-                            semi_result_list.append({
-                                '新规格': semi_spec,
-                                '新品名': new_prod_name,
-                                '新晶圆品名': semi_wafer,
-                                '未交数据和': pending_sum
-                            })
-                        
-                        # 转为 DataFrame
-                        semi_result_df = pd.DataFrame(semi_result_list)
-
                         # 删除未交数据和为 0 的行
-                        semi_result_df = semi_result_df[semi_result_df['未交数据和'] != 0].reset_index(drop=True)
-
-                        # 遍历 semi_result_df
-                        for idx, row in semi_result_df.iterrows():
+                        semi_info_table = semi_info_table[semi_info_table['未交数据和'] != 0].reset_index(drop=True)
+                        
+                        # 遍历 semi_info_table，去汇总 sheet 查找对应行（只用新规格、新晶圆品名、新品名）
+                        for idx, row in semi_info_table.iterrows():
                             semi_spec = row['新规格']
                             semi_wafer = row['新晶圆品名']
                             semi_prod = row['新品名']
                             pending_sum = row['未交数据和']
                         
-                            # 遍历 summary_sheet 的第3行开始（假设第1行为大标题，第2行为表头）
+                            found = False
+                        
                             for row_idx in range(3, summary_sheet.max_row + 1):
                                 summary_wf = summary_sheet.cell(row=row_idx, column=1).value
                                 summary_spec = summary_sheet.cell(row=row_idx, column=2).value
@@ -695,12 +685,20 @@ def main():
                         
                                 if str(summary_spec) == str(semi_spec) and str(summary_wf) == str(semi_wafer) and str(summary_prod) == str(semi_prod):
                                     # 找到匹配行 → 在“半成品”列写入 pending_sum
-                                    # 先找到“半成品”列号（第2行表头）
                                     for col_idx in range(1, summary_sheet.max_column + 1):
                                         header = summary_sheet.cell(row=2, column=col_idx).value
                                         if header == '半成品':
                                             summary_sheet.cell(row=row_idx, column=col_idx, value=pending_sum)
                                             break
+                                    found = True
+                                    break  # 已找到，无需继续查找
+                        
+                            # 在 semi_info_table 里记录是否匹配成功
+                            semi_info_table.at[idx, '是否在汇总匹配'] = 1 if found else 0
+                        
+                        # 打印最终的 semi_info_table
+                        print(semi_info_table)
+
 
                 # 标红成品在制 sheet 中未被用到的行（成品部分）
                 progress_sheet = writer.book['赛卓-成品在制']
