@@ -181,20 +181,28 @@ def apply_mapping_and_merge(df, mapping_df):
     return df_merged
 
 def adjust_column_width(ws):
-    for col in ws.columns:
-        max_length = 0
-        column = col[0].column_letter  # 获取列字母，比如 'A'
-        for cell in col:
-            try:
-                if cell.value:
-                    # 中文字符宽度大约 ×2
-                    cell_len = sum(2 if ord(char) > 127 else 1 for char in str(cell.value))
-                    if cell_len > max_length:
-                        max_length = cell_len
-            except:
-                pass
-        adjusted_width = max_length + 2  # 额外加一点空隙
-        ws.column_dimensions[column].width = adjusted_width
+    """
+    自动调整 Excel 列宽，兼容中英文，避免异常崩溃。
+    """
+    try:
+        for i, col in enumerate(ws.columns, 1):
+            max_length = 0
+            col_letter = get_column_letter(i)
+            for cell in col:
+                try:
+                    if cell.value:
+                        # 中文宽度 ×2，英文宽度 ×1
+                        length = sum(2 if ord(c) > 127 else 1 for c in str(cell.value))
+                        if length > max_length:
+                            max_length = length
+                except Exception as e_inner:
+                    print(f"跳过单元格异常：{e_inner}")
+                    continue
+            adjusted_width = max_length + 2  # 加一些余量
+            ws.column_dimensions[col_letter].width = min(adjusted_width, 50)  # 限制最大宽度
+    except Exception as e_outer:
+        print(f"调整列宽时出错：{e_outer}")
+
 
 def create_pivot(df, config, filename, mapping_df=None):
     if 'date_format' in config:
@@ -362,8 +370,13 @@ def main():
             from openpyxl.utils import get_column_letter
             last_col_letter = get_column_letter(len(df_mapping.columns))
             ws.auto_filter.ref = f"A2:{last_col_letter}2"
+            
+            # 安全调用
+            try:
+                adjust_column_width(ws)
+            except Exception as e:
+                st.warning(f"⚠️ 列宽调整失败：{e}")
 
-            adjust_column_width(ws)
 
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
