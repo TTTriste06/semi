@@ -226,16 +226,16 @@ def add_black_border(ws, row_count, col_count):
 
 def preprocess_mapping(df):
     if df is None or df.empty:
-        print("⚠️ mapping_df 为空，跳过列处理。")
+        st.warning("⚠️ mapping_df 为空，跳过列处理。")
         return pd.DataFrame(columns=['旧规格', '旧品名', '旧晶圆品名',
                                      '新规格', '新品名', '新晶圆品名',
                                      '封装厂', 'PC', '半成品'])
-    print(f"修改之前的列名: {list(df.columns)}")
+    st.write(f"⚠️ mapping_df 实际列名: {list(df.columns)}")
     
     if df.shape[1] < 9:
         raise ValueError(f"⚠️ mapping_df 列数不足 9 列，实际只有 {df.shape[1]} 列，请检查文件格式。")
     
-    df = df.iloc[:, :9]  # 保留前9列
+    df = df.iloc[:, :9]
     df.columns = ['旧规格', '旧品名', '旧晶圆品名',
                   '新规格', '新品名', '新晶圆品名',
                   '封装厂', 'PC', '半成品']
