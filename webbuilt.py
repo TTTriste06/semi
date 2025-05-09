@@ -11,6 +11,7 @@ from openpyxl.styles import Alignment
 from openpyxl.styles import PatternFill
 from openpyxl.styles import Border, Side
 from openpyxl.styles import Font
+from openpyxl import load_workbook
 
 
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
@@ -581,90 +582,77 @@ def main():
                                     inventory_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
                 ### 成品在制
-                # 取出赛卓-成品在制.xlsx 文件对象
-                product_file = None
-                for f in uploaded_files:
-                    if f.name == "赛卓-成品在制.xlsx":
-                        product_file = f
-                        break
-                
-                if product_file:
-                    product_df = pd.read_excel(product_file)
-                else:
-                    st.warning("⚠️ 没有找到 赛卓-成品在制.xlsx 文件，跳过成品在制处理。")
-                    return  # 或者用 continue，根据你的流程决定
-
+                ## 获取 worksheet
                 product_ws = writer.sheets['赛卓-成品在制']
                 summary_ws = writer.sheets['汇总']
                 mapping_ws = writer.sheets['赛卓-新旧料号']
                 
+                # 读 DataFrame
                 product_df = pd.read_excel(product_file)
                 summary_df = pd.read_excel(CONFIG['output_file'], sheet_name='汇总')
                 mapping_df = pd.read_excel(CONFIG['output_file'], sheet_name='赛卓-新旧料号')
                 
-                # 确保列名对齐
-                product_cols = product_df.columns.tolist()
-                summary_cols = summary_df.columns.tolist()
-                mapping_cols = mapping_df.columns.tolist()
-                
-                # 找到未交数据列（从第 N 列开始的数字列）
+                # 确定数字列（未交数据列）
                 numeric_cols = product_df.select_dtypes(include='number').columns.tolist()
                 
-                # 建立 mapping_df 索引
-                mapping_lookup = mapping_df.set_index(['新晶圆品名', '新规格'])
+                # 记录未匹配行号，用于后面标红
+                unmatched_rows = []
                 
-                # 遍历成品在制 sheet
-                for row_idx, row in product_df.iterrows():
+                for idx, row in product_df.iterrows():
                     wafer = row['晶圆型号']
                     spec = row['产品规格']
                     prod = row['产品品名']
                     unfulfilled_sum = row[numeric_cols].sum()
                 
-                    # 在汇总 sheet 查找
-                    summary_match = summary_df[
+                    # 汇总里直接找
+                    match = summary_df[
                         (summary_df['晶圆品名'] == wafer) &
                         (summary_df['规格'] == spec) &
                         (summary_df['品名'] == prod)
                     ]
                 
-                    if not summary_match.empty:
-                        # 找到，填入第一列空白
-                        summary_row_idx = summary_match.index[0] + 3  # 因为 Excel 第1行是合并行，第2行是表头，第3行起数据
-                        target_col = summary_ws.max_column + 1
-                        summary_ws.cell(row=summary_row_idx, column=target_col, value=unfulfilled_sum)
-                    else:
-                        # 没找到，去 mapping 查
-                        mapping_match = mapping_df[
-                            (mapping_df['新晶圆品名'] == wafer) &
-                            (mapping_df['新规格'] == spec) &
-                            (mapping_df['半成品'] == prod)
+                    if not match.empty:
+                        # 写入第一空白列
+                        row_excel = match.index[0] + 3
+                        col_excel = summary_ws.max_column + 1
+                        summary_ws.cell(row=row_excel, column=col_excel, value=unfulfilled_sum)
+                        continue
+                
+                    # 去新旧料号找
+                    map_match = mapping_df[
+                        (mapping_df['新晶圆品名'] == wafer) &
+                        (mapping_df['新规格'] == spec) &
+                        (mapping_df['半成品'] == prod)
+                    ]
+                
+                    if not map_match.empty:
+                        new_wafer = map_match['新晶圆品名'].values[0]
+                        new_spec = map_match['新规格'].values[0]
+                        new_prod = map_match['新品名'].values[0]
+                
+                        summary_map_match = summary_df[
+                            (summary_df['晶圆品名'] == new_wafer) &
+                            (summary_df['规格'] == new_spec) &
+                            (summary_df['品名'] == new_prod)
                         ]
                 
-                        if not mapping_match.empty:
-                            new_wafer = mapping_match['新晶圆品名'].values[0]
-                            new_spec = mapping_match['新规格'].values[0]
-                            new_prod = mapping_match['新品名'].values[0]
+                        if not summary_map_match.empty:
+                            # 写入第二空白列
+                            row_excel = summary_map_match.index[0] + 3
+                            col_excel = summary_ws.max_column + 2
+                            summary_ws.cell(row=row_excel, column=col_excel, value=unfulfilled_sum)
+                            continue
                 
-                            summary_mapping_match = summary_df[
-                                (summary_df['晶圆品名'] == new_wafer) &
-                                (summary_df['规格'] == new_spec) &
-                                (summary_df['品名'] == new_prod)
-                            ]
+                    # 记录未匹配行号
+                    unmatched_rows.append(idx + 2)  # Excel 的行号（带表头）
                 
-                            if not summary_mapping_match.empty:
-                                summary_row_idx = summary_mapping_match.index[0] + 3
-                                target_col = summary_ws.max_column + 2  # 第二个空白列
-                                summary_ws.cell(row=summary_row_idx, column=target_col, value=unfulfilled_sum)
-                            else:
-                                # 汇总也没找到 → 标红成品在制行
-                                for col_idx in range(1, len(product_cols) + 1):
-                                    product_ws.cell(row=row_idx + 2, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-                        else:
-                            # mapping 也没找到 → 标红成品在制行
-                            for col_idx in range(1, len(product_cols) + 1):
-                                product_ws.cell(row=row_idx + 2, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-
-
+                # 最后统一标红未匹配行
+                from openpyxl.styles import PatternFill
+                red_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+                
+                for row_idx in unmatched_rows:
+                    for col_idx in range(1, len(product_df.columns) + 1):
+                        product_ws.cell(row=row_idx, column=col_idx).fill = red_fill
 
 
 
