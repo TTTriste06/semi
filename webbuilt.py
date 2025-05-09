@@ -180,6 +180,22 @@ def apply_mapping_and_merge(df, mapping_df):
     
     return df_merged
 
+def adjust_column_width(ws):
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter  # 获取列字母，比如 'A'
+        for cell in col:
+            try:
+                if cell.value:
+                    # 中文字符宽度大约 ×2
+                    cell_len = sum(2 if ord(char) > 127 else 1 for char in str(cell.value))
+                    if cell_len > max_length:
+                        max_length = cell_len
+            except:
+                pass
+        adjusted_width = max_length + 2  # 额外加一点空隙
+        ws.column_dimensions[column].width = adjusted_width
+
 def create_pivot(df, config, filename, mapping_df=None):
     if 'date_format' in config:
         config = config.copy()
@@ -345,25 +361,9 @@ def main():
             # 开启 Excel 筛选器（第2行是表头）
             from openpyxl.utils import get_column_letter
             last_col_letter = get_column_letter(len(df_mapping.columns))
-            ws.auto_filter.ref = f"A2:{last_col_letter}2"
+            ws.auto_filter.ref = f"A2:{last_col_letter}2
 
-            for col in ws.columns:
-                max_length = 0
-                column = col[0].column_letter  # 获取列字母，比如 'A'
-                for cell in col:
-                    try:
-                        if cell.value:
-                            # 中文字符宽度大约 ×2
-                            cell_len = sum(2 if ord(char) > 127 else 1 for char in str(cell.value))
-                            if cell_len > max_length:
-                                max_length = cell_len
-                    except:
-                        pass
-                adjusted_width = max_length + 2  # 额外加一点空隙
-                ws.column_dimensions[column].width = adjusted_width
-
-
-        
+            adjust_column_width(ws)
 
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
