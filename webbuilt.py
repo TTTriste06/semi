@@ -578,85 +578,58 @@ def main():
                                     inventory_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
                 ### 成品在制
-                ## 获取 worksheet
-                # 找到赛卓-成品在制文件
-                product_file = next((f for f in uploaded_files if f.name == "赛卓-成品在制.xlsx"), None)
-                if product_file:
-                    product_df = pd.read_excel(product_file)
-                    # 后续的处理逻辑...
-                else:
-                    st.warning("⚠️ 未上传 赛卓-成品在制.xlsx，将跳过成品在制部分")
+                # === 从生成的赛卓-成品在制中提取信息，写入汇总 sheet ===
+                product_in_progress_pivoted = None
+                for f in uploaded_files:
+                    if f.name == "赛卓-成品在制.xlsx":
+                        df_product_in_progress = pd.read_excel(f)
+                        config_in_progress = CONFIG['pivot_config']['赛卓-成品在制.xlsx']
+                        if 'date_format' in config_in_progress and config_in_progress['columns'] in df_product_in_progress.columns:
+                            df_product_in_progress = process_date_column(df_product_in_progress, config_in_progress['columns'], config_in_progress['date_format'])
+                        product_in_progress_pivoted = create_pivot(df_product_in_progress, config_in_progress, f.name, mapping_df)
+                        break
                 
-
-                product_ws = writer.sheets['赛卓-成品在制']
-                summary_ws = writer.sheets['汇总']
-                mapping_ws = writer.sheets['赛卓-新旧料号']
+                if product_in_progress_pivoted is not None:
+                    numeric_cols = product_in_progress_pivoted.select_dtypes(include='number').columns.tolist()
+                    if numeric_cols:
+                        # 构造 key
+                        in_progress_key = product_in_progress_pivoted[['晶圆型号', '产品规格', '产品品名']].astype(str)
+                        summary_key = unfulfilled_orders_summary[['晶圆品名', '规格', '品名']].astype(str)
                 
-                # 读 DataFrame
-                product_df = pd.read_excel(product_file)
-                summary_df = pd.read_excel(CONFIG['output_file'], sheet_name='汇总')
-                mapping_df = pd.read_excel(CONFIG['output_file'], sheet_name='赛卓-新旧料号')
+                        product_in_progress_pivoted['已匹配'] = False
                 
-                # 确定数字列（未交数据列）
-                numeric_cols = product_df.select_dtypes(include='number').columns.tolist()
+                        # 定位汇总 sheet
+                        summary_sheet = writer.sheets['汇总']
+                        start_col = summary_sheet.max_column + 1
                 
-                # 记录未匹配行号，用于后面标红
-                unmatched_rows = []
+                        # 合并第一行写“成品在制”
+                        summary_sheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=start_col)
+                        summary_sheet.cell(row=1, column=start_col, value='成品在制').alignment = Alignment(horizontal='center', vertical='center')
+                        summary_sheet.cell(row=2, column=start_col, value='未交合计').alignment = Alignment(horizontal='center', vertical='center')
                 
-                for idx, row in product_df.iterrows():
-                    wafer = row['晶圆型号']
-                    spec = row['产品规格']
-                    prod = row['产品品名']
-                    unfulfilled_sum = row[numeric_cols].sum()
+                        # 遍历汇总表行（从第3行开始）
+                        for row_idx in range(3, summary_sheet.max_row + 1):
+                            summary_wf = summary_sheet.cell(row=row_idx, column=1).value
+                            summary_spec = summary_sheet.cell(row=row_idx, column=2).value
+                            summary_prod = summary_sheet.cell(row=row_idx, column=3).value
                 
-                    # 汇总里直接找
-                    match = summary_df[
-                        (summary_df['晶圆品名'] == wafer) &
-                        (summary_df['规格'] == spec) &
-                        (summary_df['品名'] == prod)
-                    ]
+                            match = product_in_progress_pivoted[
+                                (product_in_progress_pivoted['晶圆型号'].astype(str) == str(summary_wf)) &
+                                (product_in_progress_pivoted['产品规格'].astype(str) == str(summary_spec)) &
+                                (product_in_progress_pivoted['产品品名'].astype(str) == str(summary_prod))
+                            ]
                 
-                    if not match.empty:
-                        # 写入第一空白列
-                        row_excel = match.index[0] + 3
-                        col_excel = summary_ws.max_column + 1
-                        summary_ws.cell(row=row_excel, column=col_excel, value=unfulfilled_sum)
-                        continue
+                            if not match.empty:
+                                total_unfulfilled = match[numeric_cols].sum(axis=1).values[0]
+                                summary_sheet.cell(row=row_idx, column=start_col, value=total_unfulfilled)
+                                product_in_progress_pivoted.loc[match.index, '已匹配'] = True
                 
-                    # 去新旧料号找
-                    map_match = mapping_df[
-                        (mapping_df['新晶圆品名'] == wafer) &
-                        (mapping_df['新规格'] == spec) &
-                        (mapping_df['半成品'] == prod)
-                    ]
-                
-                    if not map_match.empty:
-                        new_wafer = map_match['新晶圆品名'].values[0]
-                        new_spec = map_match['新规格'].values[0]
-                        new_prod = map_match['新品名'].values[0]
-                
-                        summary_map_match = summary_df[
-                            (summary_df['晶圆品名'] == new_wafer) &
-                            (summary_df['规格'] == new_spec) &
-                            (summary_df['品名'] == new_prod)
-                        ]
-                
-                        if not summary_map_match.empty:
-                            # 写入第二空白列
-                            row_excel = summary_map_match.index[0] + 3
-                            col_excel = summary_ws.max_column + 2
-                            summary_ws.cell(row=row_excel, column=col_excel, value=unfulfilled_sum)
-                            continue
-                
-                    # 记录未匹配行号
-                    unmatched_rows.append(idx + 2)  # Excel 的行号（带表头）
-                
-                # 最后统一标红未匹配行
-                red_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-                
-                for row_idx in unmatched_rows:
-                    for col_idx in range(1, len(product_df.columns) + 1):
-                        product_ws.cell(row=row_idx, column=col_idx).fill = red_fill
+                        # 在赛卓-成品在制 sheet 中标红未匹配行
+                        in_progress_sheet = writer.book['赛卓-成品在制']
+                        for row_idx, matched in enumerate(product_in_progress_pivoted['已匹配'], start=2):
+                            if not matched:
+                                for col_idx in range(1, len(product_in_progress_pivoted.columns) + 1):
+                                    in_progress_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
 
 
