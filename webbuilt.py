@@ -590,20 +590,9 @@ def main():
                                     inventory_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
                 ### 成品在制
-                
-
-                
                 semi_finished_value = 0
                 semi_row = pd.DataFrame()  # ✅ 先定义为空 DataFrame
-                # 先检查 mapping_df 是否存在
-                if mapping_df is not None:
-                    st.write("📦 mapping_df 当前内容：")
-                    st.dataframe(mapping_df)
-                else:
-                    st.warning("⚠️ mapping_df 是 None，没有读取到任何内容。")
-    
-                
-        
+
                 product_in_progress_pivoted = None
                 for f in uploaded_files:
                     if f.name == "赛卓-成品在制.xlsx":
@@ -639,9 +628,6 @@ def main():
                         ]
                 
                         finished_value = match[numeric_cols].sum(axis=1).values[0] if not match.empty else 0
-
-                        st.write("df_full_mapping['半成品'] 内容：")
-                        st.write(df_full_mapping['半成品'])
 
                         # 先找 mapping 表中满足晶圆品名、规格、品名、且半成品列非空的行
                         semi_match = df_full_mapping[
