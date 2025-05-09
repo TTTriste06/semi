@@ -645,9 +645,9 @@ def main():
 
                         # 去 mapping 里找半成品替换
                         semi_match = df_full_mapping[
-                            (df_full_mapping['新晶圆品名'].astype(str) == str(summary_wf)) &
-                            (df_full_mapping['新规格'].astype(str) == str(summary_spec)) &
-                            (df_full_mapping['半成品'].astype(str) == str(summary_prod))
+                            (df_full_mapping['新晶圆品名'].astype(str) == str(finished_row['晶圆型号'])) &
+                            (df_full_mapping['新规格'].astype(str) == str(finished_row['产品规格'])) &
+                            (df_full_mapping['半成品'].astype(str) == str(finished_row['产品品名']))
                         ]
 
                         semi_finished_value = 0
