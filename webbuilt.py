@@ -90,20 +90,10 @@ def upload_to_github(file, path_in_repo, commit_message):
 
 
 def preprocess_mapping_file(df):
-    if df is None or df.empty:
-        st.warning("⚠️ mapping_df 为空，跳过列处理。")
-        return pd.DataFrame(columns=['旧规格', '旧品名', '旧晶圆品名',
-                                     '新规格', '新品名', '新晶圆品名',
-                                     '封装厂', 'PC', '半成品'])
-    st.write(f"⚠️ mapping_df 实际列名: {list(df.columns)}")
-    
-    if df.shape[1] < 9:
-        raise ValueError(f"⚠️ mapping_df 列数不足 9 列，实际只有 {df.shape[1]} 列，请检查文件格式。")
-    
-    df = df.iloc[:, :9]
-    df.columns = ['旧规格', '旧品名', '旧晶圆品名',
-                  '新规格', '新品名', '新晶圆品名',
-                  '封装厂', 'PC', '半成品']
+    # 只取前6列
+    df = df.iloc[:, :6]
+    # 重命名列
+    df.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名']
     return df
 
 def download_mapping_from_github(path_in_repo):
@@ -233,59 +223,6 @@ def add_black_border(ws, row_count, col_count):
     for row in ws.iter_rows(min_row=1, max_row=row_count, min_col=1, max_col=col_count):
         for cell in row:
             cell.border = border
-
-
-
-def safe_preprocess_mapping_file(mapping_df):
-    expected_cols = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
-    if list(mapping_df.columns[:9]) != expected_cols:
-        mapping_df = preprocess_mapping_file(mapping_df)
-    return mapping_df
-
-
-def fill_finished_in_summary(finished_df, summary_df, mapping_df):
-    if mapping_df is None or mapping_df.empty:
-        print("⚠️ mapping_df 为空，跳过成品在制匹配。")
-        return summary_df
-
-    mapping_df = preprocess_mapping_file(mapping_df)
-    value_cols = finished_df.columns[3:]
-
-    for idx, row in finished_df.iterrows():
-        wafer = row['晶圆型号']
-        spec = row['产品规格']
-        prod_name = row['产品品名']
-        values = row[value_cols]
-
-        match_idx = summary_df[
-            (summary_df['晶圆品名'] == wafer) &
-            (summary_df['规格'] == spec) &
-            (summary_df['品名'] == prod_name)
-        ].index
-
-        if not match_idx.empty:
-            summary_df.loc[match_idx, summary_df.columns[-len(value_cols):]] = values.values
-        else:
-            map_match = mapping_df[
-                (mapping_df['旧晶圆品名'] == wafer) &
-                (mapping_df['旧规格'] == spec) &
-                (mapping_df['半成品'] == prod_name)
-            ]
-            if not map_match.empty:
-                new_wafer = map_match['新晶圆品名'].values[0]
-                new_prod = map_match['新品名'].values[0]
-                new_idx = summary_df[
-                    (summary_df['晶圆品名'] == new_wafer) &
-                    (summary_df['规格'] == spec) &
-                    (summary_df['品名'] == new_prod)
-                ].index
-
-                if not new_idx.empty:
-                    summary_df.loc[new_idx, summary_df.columns[-len(value_cols):]] = values.values
-
-    return summary_df
-
-
 
 def main():
     st.set_page_config(
@@ -584,22 +521,7 @@ def main():
                                     inventory_sheet.cell(row=row_idx, column=col_idx).fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
 
                 ### 成品在制
-                finished_df = None
-                for f in uploaded_files:
-                    if f.name == "赛卓-成品在制.xlsx":
-                        finished_df = pd.read_excel(f)
-                        break
-                
-                if finished_df is not None:
-                    num_extra_cols = finished_df.shape[1] - 3
-                    for i in range(num_extra_cols):
-                        unfulfilled_orders_summary[f'成品在制_{i+1}'] = None
-                
-                    unfulfilled_orders_summary = fill_finished_in_summary(
-                        finished_df, 
-                        unfulfilled_orders_summary, 
-                        mapping_df
-                    )
+
 
 
 
