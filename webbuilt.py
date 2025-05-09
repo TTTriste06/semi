@@ -371,11 +371,19 @@ def main():
             last_col_letter = get_column_letter(len(df_mapping.columns))
             ws.auto_filter.ref = f"A2:{last_col_letter}2"
             
-            # 安全调用
-            try:
-                adjust_column_width(ws)
-            except Exception as e:
-                st.warning(f"⚠️ 列宽调整失败：{e}")
+            # 自动调整列宽
+            for idx, col in enumerate(ws.columns, 1):
+                col_letter = get_column_letter(idx)
+                max_length = 0
+                for cell in col:
+                    try:
+                          if cell.value:
+                            cell_len = sum(2 if ord(char) > 127 else 1 for char in str(cell.value))
+                            max_length = max(max_length, cell_len)
+                    except:
+                           pass
+                ws.column_dimensions[col_letter].width = max_length + 5
+
 
 
             # 写入汇总 sheet
