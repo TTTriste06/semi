@@ -409,7 +409,6 @@ def main():
             # 开启 Excel 筛选器（第2行是表头）
             last_col_letter = get_column_letter(len(df_mapping.columns))
             ws.auto_filter.ref = f"A2:{last_col_letter}2"
-            df_pred = read_excel()
 
             # 定义新的列名
             new_column_names = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
