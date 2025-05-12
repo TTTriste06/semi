@@ -142,9 +142,6 @@ def download_backup_file(file_name):
 
     try:
         df = pd.read_excel(file_bytes)
-        if "mapping_file" in file_name:
-            if df.shape[1] >= 6:
-                df = preprocess_mapping_file(df)
     except Exception as e:
         st.warning(f"⚠️ {file_name} 解析 Excel 失败：{e}，将创建空 sheet。")
         return pd.DataFrame()
@@ -227,32 +224,6 @@ def add_black_border(ws, row_count, col_count):
         for cell in row:
             cell.border = border
 
-def convert_and_upload_mapping_file(uploaded_excel):
-    df = pd.read_excel(uploaded_excel)
-    df = preprocess_mapping_file(df)  # 只保留前6列并标准化列名
-
-    buffer = BytesIO()
-    df.to_csv(buffer, index=False, encoding='utf-8-sig')
-    buffer.seek(0)
-    upload_to_github(buffer, "mapping_file.csv", "替换新旧料号映射表（转换自上传Excel）")
-
-    st.success("✅ 新旧料号表已成功上传并标准化保存为 CSV")
-
-    return df
-    
-def load_mapping_csv():
-    api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/mapping_file.csv"
-    response = requests.get(api_url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
-    if response.status_code == 200:
-        content = base64.b64decode(response.json()['content'])
-        df = pd.read_csv(BytesIO(content), encoding='utf-8-sig')
-        return df
-    else:
-        st.warning("⚠️ 无法从 GitHub 读取映射表 CSV")
-        return pd.DataFrame(columns=['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名'])
-
-
-
 def main():
     st.set_page_config(
         page_title='我是标题',
@@ -276,6 +247,10 @@ def main():
 
     # 加载 mapping_file DataFrame
     mapping_df = None
+    if mapping_file:
+        mapping_df = pd.read_excel(mapping_file)
+        mapping_df = preprocess_mapping_file(mapping_df)
+
     if pred_file:
         upload_to_github(pred_file, "pred_file.xlsx", "上传预测文件")
     if safety_file:
@@ -343,15 +318,74 @@ def main():
             else:
                 df_full_mapping = download_backup_file("mapping_file.xlsx")
                 df_full_mapping.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
-
-            if mapping_file:
-                mapping_df = convert_and_upload_mapping_file(mapping_file)
-            else:
-                mapping_df = load_mapping_csv()
-
-    
-            # 写入新旧料号文件 sheet
             
+            # 写入新旧料号文件 sheet
+            if mapping_file:
+                df_mapping = pd.read_excel(mapping_file, header = 1)
+            else:
+                df_mapping = download_backup_file("mapping_file.xlsx")
+           
+            # 第3行开始写入数据（跳过第1、2行）
+            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False, header=False, startrow=2)
+            
+            # 获取 worksheet
+            ws = writer.book['赛卓-新旧料号']
+            ws.delete_rows(0)
+
+            # 写入第2行表头（DataFrame 的列名）
+            for col_idx, col_name in enumerate(df_mapping.columns, start=1):
+                ws.cell(row=2, column=col_idx, value=col_name)
+                ws.cell(row=2, column=col_idx).alignment = Alignment(horizontal='center', vertical='center')
+                ws.cell(row=2, column=col_idx).font = Font(bold=True)
+            
+            # 写入第1行大标题（合并单元格）
+            ws.merge_cells('A1:C1')
+            ws['A1'] = '旧'
+            ws.merge_cells('D1:F1')
+            ws['D1'] = '新'
+            
+            # 设置第1行填充颜色、居中、加粗
+            yellow_fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
+            green_fill = PatternFill(start_color='00FF00', end_color='00FF00', fill_type='solid')
+            
+            for cell in ['A1', 'B1', 'C1']:
+                ws[cell].fill = yellow_fill
+            for cell in ['D1', 'E1', 'F1']:
+                ws[cell].fill = green_fill
+            
+            for col in range(1, len(df_mapping.columns) + 1):
+                ws.cell(row=1, column=col).alignment = Alignment(horizontal='center', vertical='center')
+                ws.cell(row=1, column=col).font = Font(bold=True)
+            
+            # 开启 Excel 筛选器（第2行是表头）
+            from openpyxl.utils import get_column_letter
+            last_col_letter = get_column_letter(len(df_mapping.columns))
+            ws.auto_filter.ref = f"A2:{last_col_letter}2"
+
+            # 定义新的列名
+            new_column_names = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
+            
+            # 直接重命名第二行每一列
+            for col_idx, col_name in enumerate(new_column_names, start=1):
+                ws.cell(row=2, column=col_idx, value=col_name)
+                ws.cell(row=2, column=col_idx).alignment = Alignment(horizontal='center', vertical='center')
+                ws.cell(row=2, column=col_idx).font = Font(bold=True)
+                
+            # 自动调整列宽
+            for idx, col in enumerate(ws.columns, 1):
+                col_letter = get_column_letter(idx)
+                max_length = 0
+                for cell in col:
+                    try:
+                          if cell.value:
+                            cell_len = sum(2 if ord(char) > 127 else 1 for char in str(cell.value))
+                            max_length = max(max_length, cell_len)
+                    except:
+                           pass
+                ws.column_dimensions[col_letter].width = max_length + 5
+
+
+
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
                 unfulfilled_orders_summary.to_excel(writer, sheet_name='汇总', index=False, startrow=1)
