@@ -7,7 +7,7 @@ def setup_sidebar():
         st.title("欢迎来到我的应用")
         st.markdown('---')
         st.markdown('### 功能简介：')
-        st.markdown('- 生成汇总报告\n- 自动匹配料号\n- 标红异常数据')
+        st.markdown('- 生成汇总报告')
 
 
 def get_user_inputs():
