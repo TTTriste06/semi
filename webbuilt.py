@@ -287,11 +287,11 @@ def main():
         mapping_df = preprocess_mapping_file(mapping_df)
 
     if mapping_file:
-    mapping_df = pd.read_excel(mapping_file)
-    mapping_df = preprocess_mapping_file(mapping_df)
+        mapping_df = pd.read_excel(mapping_file)
+        mapping_df = preprocess_mapping_file(mapping_df)
     
-    # ⚠️ 进行一致性对比
-    compare_uploaded_and_github_file(mapping_file, "mapping_file.xlsx")
+        # ⚠️ 进行一致性对比
+        compare_uploaded_and_github_file(mapping_file, "mapping_file.xlsx")
 
 
     if pred_file:
