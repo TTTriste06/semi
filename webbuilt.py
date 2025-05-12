@@ -11,7 +11,8 @@ from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
 
 
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
-REPO_NAME = "TTTriste06/semi"
+REPO_OWNER = 'TTTriste06'
+REPO_NAME = 'semi'
 BRANCH = "main"
 
 CONFIG = {
@@ -54,38 +55,52 @@ CONFIG = {
     }
 }
 
-def upload_to_github(file, path_in_repo, commit_message):
-    api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{path_in_repo}"
-    
-    file.seek(0)  # 确保指针在开头
-    file_content = file.read()
-    encoded_content = base64.b64encode(file_content).decode('utf-8')
+def upload_to_github(file_path, path_in_repo):
+    # 强制将路径转小写
+    path_in_repo = path_in_repo.lower()
 
-    # 先获取文件 SHA（如果存在）
+    # 获取 GitHub 仓库中的文件 sha
+    api_url = f'https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{path_in_repo}'
     response = requests.get(api_url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
+    
     if response.status_code == 200:
+        # 获取 sha 用于文件更新
         sha = response.json()['sha']
+        st.write(f"当前 sha: {sha}")
     else:
         sha = None
+        st.warning(f"获取 sha 失败: {response.text}")
 
-    # 构造 payload
+    # 获取文件内容
+    with open(file_path, 'rb') as f:
+        content = f.read()
+    
+    # 将文件内容进行 Base64 编码
+    import base64
+    encoded_content = base64.b64encode(content).decode()
+
+    # 构造请求 payload
     payload = {
-        "message": commit_message,
-        "content": encoded_content,
-        "branch": BRANCH
+        "message": "上传新旧料号文件",  # 提交的消息
+        "content": encoded_content,  # Base64 编码的文件内容
     }
+    
+    # 如果文件存在（sha 不为 None），就更新文件
     if sha:
         payload["sha"] = sha
-
-    # 上传文件
-    response = requests.put(api_url, json=payload, headers={"Authorization": f"token {GITHUB_TOKEN}"})
-
-    # 结果反馈
-    if response.status_code in [200, 201]:
-        st.success(f"{path_in_repo} 上传成功！")
+        st.write(f"准备更新文件: {path_in_repo}，sha: {sha}")
     else:
-        st.error(f"上传失败: {response.json()}")
+        st.write(f"准备上传新文件: {path_in_repo}")
 
+    # 上传文件或更新文件
+    response = requests.put(api_url, json=payload, headers={"Authorization": f"token {GITHUB_TOKEN}"})
+    
+    # 检查响应结果
+    if response.status_code == 201 or response.status_code == 200:
+        st.success(f"文件 '{path_in_repo}' 已成功上传或更新！")
+        st.write(f"GitHub 返回的结果: {response.json()}")
+    else:
+        st.error(f"文件上传失败！错误信息: {response.text}")
 
 def preprocess_mapping_file(df):
     # 只取前6列
