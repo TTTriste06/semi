@@ -353,74 +353,27 @@ def main():
             else:
                 df_full_mapping = download_backup_file("mapping_file.xlsx")
                 df_full_mapping.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
-            
-            # 写入新旧料号文件 sheet
+
             if mapping_file:
-                df_mapping = pd.read_excel(mapping_file, header = 1)
-            else:
-                df_mapping = download_backup_file("mapping_file.xlsx")
-           
-            # 第3行开始写入数据（跳过第1、2行）
-            df_mapping.to_excel(writer, sheet_name='赛卓-新旧料号', index=False, header=False, startrow=2)
-            
-            # 获取 worksheet
-            ws = writer.book['赛卓-新旧料号']
-            ws.delete_rows(0)
-
-            # 写入第2行表头（DataFrame 的列名）
-            for col_idx, col_name in enumerate(df_mapping.columns, start=1):
-                ws.cell(row=2, column=col_idx, value=col_name)
-                ws.cell(row=2, column=col_idx).alignment = Alignment(horizontal='center', vertical='center')
-                ws.cell(row=2, column=col_idx).font = Font(bold=True)
-            
-            # 写入第1行大标题（合并单元格）
-            ws.merge_cells('A1:C1')
-            ws['A1'] = '旧'
-            ws.merge_cells('D1:F1')
-            ws['D1'] = '新'
-            
-            # 设置第1行填充颜色、居中、加粗
-            yellow_fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
-            green_fill = PatternFill(start_color='00FF00', end_color='00FF00', fill_type='solid')
-            
-            for cell in ['A1', 'B1', 'C1']:
-                ws[cell].fill = yellow_fill
-            for cell in ['D1', 'E1', 'F1']:
-                ws[cell].fill = green_fill
-            
-            for col in range(1, len(df_mapping.columns) + 1):
-                ws.cell(row=1, column=col).alignment = Alignment(horizontal='center', vertical='center')
-                ws.cell(row=1, column=col).font = Font(bold=True)
-            
-            # 开启 Excel 筛选器（第2行是表头）
-            from openpyxl.utils import get_column_letter
-            last_col_letter = get_column_letter(len(df_mapping.columns))
-            ws.auto_filter.ref = f"A2:{last_col_letter}2"
-
-            # 定义新的列名
-            new_column_names = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
-            
-            # 直接重命名第二行每一列
-            for col_idx, col_name in enumerate(new_column_names, start=1):
-                ws.cell(row=2, column=col_idx, value=col_name)
-                ws.cell(row=2, column=col_idx).alignment = Alignment(horizontal='center', vertical='center')
-                ws.cell(row=2, column=col_idx).font = Font(bold=True)
+                # 用 CSV 替代 Excel
+                mapping_bytes = mapping_file.read()
+                mapping_file.seek(0)
                 
-            # 自动调整列宽
-            for idx, col in enumerate(ws.columns, 1):
-                col_letter = get_column_letter(idx)
-                max_length = 0
-                for cell in col:
-                    try:
-                          if cell.value:
-                            cell_len = sum(2 if ord(char) > 127 else 1 for char in str(cell.value))
-                            max_length = max(max_length, cell_len)
-                    except:
-                           pass
-                ws.column_dimensions[col_letter].width = max_length + 5
+                # 显示版本
+                st.info("📤 正在上传并替换新旧料号映射表...")
+                
+                # 上传 CSV 到 GitHub
+                upload_to_github(BytesIO(mapping_bytes), "mapping_file.csv", "上传新旧料号映射表")
+                
+                # 转换成 DataFrame 供后续使用
+                mapping_df = pd.read_csv(BytesIO(mapping_bytes))
+            else:
+                # 默认从 GitHub 下载 CSV
+                mapping_df = download_mapping_csv_from_github("mapping_file.csv")
 
-
-
+    
+            # 写入新旧料号文件 sheet
+            
             # 写入汇总 sheet
             if not unfulfilled_orders_summary.empty:
                 unfulfilled_orders_summary.to_excel(writer, sheet_name='汇总', index=False, startrow=1)
