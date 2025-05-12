@@ -4,6 +4,7 @@ import pandas as pd
 import requests
 import base64
 import hashlib
+import time
 from io import BytesIO
 from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
@@ -233,6 +234,8 @@ def add_black_border(ws, row_count, col_count):
             cell.border = border
 
 def main():
+    start_time = time.time()
+    
     st.set_page_config(
         page_title='我是标题',
         page_icon=' ',
@@ -772,6 +775,9 @@ def main():
             max_row = 2  
             max_col = summary_sheet.max_column
             add_black_border(summary_sheet, max_row, max_col)
+            
+            end_time = time.time()
+            print(f"预测部分运行耗时: {end_time - start_time:.2f} 秒")
 
                     
 
