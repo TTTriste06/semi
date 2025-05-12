@@ -513,18 +513,36 @@ def main():
                         summary_sheet.cell(row=2, column=start_col+1, value='合计金额').alignment = Alignment(horizontal='center', vertical='center')
                 
                         # 遍历汇总 sheet 的数据行（从第3行开始）
+                        # ✅ 先构造 df_pred 的字典（key → (晶圆品名, 产品型号, ProductionNO.)）
+                        pred_dict = {
+                            (str(row['晶圆品名']), str(row['产品型号']), str(row['ProductionNO.'])): (row['合计数量'], row['合计金额'])
+                            for _, row in df_pred.iterrows()
+                        }
+                        
+                        # ✅ 添加匹配标志列（用于标红）
+                        df_pred['已匹配'] = False
+                        
+                        # ✅ 执行快速匹配
                         for row_idx in range(3, summary_sheet.max_row + 1):
-                            summary_wf = summary_sheet.cell(row=row_idx, column=1).value
-                            summary_spec = summary_sheet.cell(row=row_idx, column=2).value
-                            summary_prod = summary_sheet.cell(row=row_idx, column=3).value
-                
-                            # 查找预测表匹配行
-                            match = df_pred[
-                                (df_pred['晶圆品名'].astype(str) == str(summary_wf)) &
-                                (df_pred['产品型号'].astype(str) == str(summary_spec)) &
-                                (df_pred['ProductionNO.'].astype(str) == str(summary_prod))
-                            ]
-                
+                            summary_wf = str(summary_sheet.cell(row=row_idx, column=1).value)
+                            summary_spec = str(summary_sheet.cell(row=row_idx, column=2).value)
+                            summary_prod = str(summary_sheet.cell(row=row_idx, column=3).value)
+                        
+                            match_key = (summary_wf, summary_spec, summary_prod)
+                        
+                            if match_key in pred_dict:
+                                qty, amt = pred_dict[match_key]
+                                summary_sheet.cell(row=row_idx, column=start_col, value=qty)
+                                summary_sheet.cell(row=row_idx, column=start_col + 1, value=amt)
+                        
+                                # 标记预测表中该行已匹配
+                                df_pred.loc[
+                                    (df_pred['晶圆品名'].astype(str) == summary_wf) &
+                                    (df_pred['产品型号'].astype(str) == summary_spec) &
+                                    (df_pred['ProductionNO.'].astype(str) == summary_prod),
+                                    '已匹配'
+                                ] = True
+
                             if not match.empty:
                                 qty = match['合计数量'].values[0]
                                 amt = match['合计金额'].values[0]
