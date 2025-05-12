@@ -342,8 +342,19 @@ def main():
                 for col_idx, value in enumerate(row, start=1):
                     worksheet.cell(row=row_idx + 3, column=col_idx, value=value)
             
-            # 自动调整列宽
-            adjust_column_width(writer, sheet_name, df_pred)
+            # 手动调整列宽（适配 worksheet 写法）
+            for col_idx, col_cells in enumerate(worksheet.columns, 1):
+                max_length = 0
+                col_letter = get_column_letter(col_idx)
+                for cell in col_cells:
+                    if cell.value:
+                        try:
+                            length = sum(2 if ord(char) > 127 else 1 for char in str(cell.value))
+                            max_length = max(max_length, length)
+                        except:
+                            pass
+                worksheet.column_dimensions[col_letter].width = max_length + 5
+
 
 
             # 写入新旧料号文件 sheet
