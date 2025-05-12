@@ -77,24 +77,20 @@ def main():
             summary_df.to_excel(writer, sheet_name='汇总', index=False, startrow=1)
             summary_sheet = writer.sheets['汇总']
 
-            # 合并安全库存
+            # 加入安全库存
             df_safety = pd.read_excel(safety_file) if safety_file else download_excel_from_repo("safety_file.xlsx")
             merged_summary_df, df_safety = merge_safety_inventory(summary_df, df_safety, summary_sheet)
 
-            # 合并未交订单
+            # 加入未交订单
             if pending_df is not None:
                 start_col = summary_df.shape[1] + 2 + 1
                 _ = merge_unfulfilled_orders(summary_sheet, pending_df, start_col)
 
-            # 合并预测文件
+            # 加入预测
             df_pred = pd.read_excel(pred_file) if pred_file else download_excel_from_repo("pred_file.xlsx")
             df_pred = merge_prediction_data(summary_sheet, df_pred, summary_df)
 
-            # 标红未匹配预测
-            pred_ws = writer.book['赛卓-预测']
-            mark_unmatched_rows(pred_ws, df_pred, start_row=3)
-
-            # 汇总样式调整
+            # 样式调整
             auto_adjust_column_width_by_worksheet(summary_sheet)
             add_black_border(summary_sheet, 2, summary_sheet.max_column)
 
