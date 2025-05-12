@@ -227,33 +227,30 @@ def add_black_border(ws, row_count, col_count):
         for cell in row:
             cell.border = border
 
-def file_md5(file_bytes):
-    """计算文件内容的 md5 哈希值"""
-    hasher = hashlib.md5()
-    hasher.update(file_bytes.read())
-    file_bytes.seek(0)  # 重置指针以防止后续读取出错
-    return hasher.hexdigest()
+def convert_and_upload_mapping_file(uploaded_excel):
+    df = pd.read_excel(uploaded_excel)
+    df = preprocess_mapping_file(df)  # 只保留前6列并标准化列名
 
-def compare_mapping_df(uploaded_file, github_file_name):
-    try:
-        uploaded_df = pd.read_excel(uploaded_file).iloc[:, :6]
-        uploaded_df.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名']
-    except Exception as e:
-        st.error(f"上传文件读取失败: {e}")
-        return
+    buffer = BytesIO()
+    df.to_csv(buffer, index=False, encoding='utf-8-sig')
+    buffer.seek(0)
+    upload_to_github(buffer, "mapping_file.csv", "替换新旧料号映射表（转换自上传Excel）")
 
-    github_df = download_backup_file(github_file_name)
-    if github_df.empty:
-        st.warning("无法从 GitHub 下载文件用于对比")
-        return
+    st.success("✅ 新旧料号表已成功上传并标准化保存为 CSV")
 
-    github_df = github_df.iloc[:, :6]
-    github_df.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名']
-
-    if uploaded_df.equals(github_df):
-        st.success("✅ 上传的新旧料号内容与 GitHub 上完全一致（按逻辑字段）")
+    return df
+    
+def load_mapping_csv():
+    api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/mapping_file.csv"
+    response = requests.get(api_url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
+    if response.status_code == 200:
+        content = base64.b64decode(response.json()['content'])
+        df = pd.read_csv(BytesIO(content), encoding='utf-8-sig')
+        return df
     else:
-        st.warning("⚠️ 上传的新旧料号内容与 GitHub 上不一致，请检查是否编辑过文件（即使内容看起来一样）")
+        st.warning("⚠️ 无法从 GitHub 读取映射表 CSV")
+        return pd.DataFrame(columns=['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名'])
+
 
 
 def main():
@@ -279,13 +276,6 @@ def main():
 
     # 加载 mapping_file DataFrame
     mapping_df = None
-    if mapping_file:
-        mapping_df = pd.read_excel(mapping_file)
-        mapping_df = preprocess_mapping_file(mapping_df)
-
-        compare_mapping_df(mapping_file, "mapping_file.xlsx")
-
-
     if pred_file:
         upload_to_github(pred_file, "pred_file.xlsx", "上传预测文件")
     if safety_file:
@@ -355,21 +345,9 @@ def main():
                 df_full_mapping.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
 
             if mapping_file:
-                # 用 CSV 替代 Excel
-                mapping_bytes = mapping_file.read()
-                mapping_file.seek(0)
-                
-                # 显示版本
-                st.info("📤 正在上传并替换新旧料号映射表...")
-                
-                # 上传 CSV 到 GitHub
-                upload_to_github(BytesIO(mapping_bytes), "mapping_file.csv", "上传新旧料号映射表")
-                
-                # 转换成 DataFrame 供后续使用
-                mapping_df = pd.read_csv(BytesIO(mapping_bytes))
+                mapping_df = convert_and_upload_mapping_file(mapping_file)
             else:
-                # 默认从 GitHub 下载 CSV
-                mapping_df = download_mapping_csv_from_github("mapping_file.csv")
+                mapping_df = load_mapping_csv()
 
     
             # 写入新旧料号文件 sheet
