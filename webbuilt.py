@@ -11,11 +11,11 @@ from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
 
 @st.cache_data(show_spinner="正在读取上传的 Excel 文件...")
 def load_excel(uploaded_file):
-    return pd.read_excel(uploaded_file)
+    return load_excel(uploaded_file)
 
 @st.cache_data(show_spinner="正在解析 GitHub 上的 Excel 文件...")
 def load_excel_from_bytes(byte_content):
-    return pd.read_excel(BytesIO(byte_content))
+    return load_excel(BytesIO(byte_content))
 
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
 REPO_NAME = "TTTriste06/semi"
@@ -137,7 +137,7 @@ def download_excel_from_github(url, token=None):
     if 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' not in content_type:
         raise ValueError("下载的不是 Excel 文件，请检查 GitHub 链接或权限")
 
-    return pd.read_excel(BytesIO(response.content))
+    return load_excel(BytesIO(response.content))
 
 def download_backup_file(file_name):
     api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{file_name}"
@@ -156,7 +156,7 @@ def download_backup_file(file_name):
     file_bytes = BytesIO(base64.b64decode(content))
 
     try:
-        df = pd.read_excel(file_bytes)
+        df = load_excel_from_bytes(file_bytes.read())
     except Exception as e:
         st.warning(f"⚠️ {file_name} 解析 Excel 失败：{e}，将创建空 sheet。")
         return pd.DataFrame()
@@ -263,7 +263,7 @@ def main():
     # 加载 mapping_file DataFrame
     mapping_df = None
     if mapping_file:
-        mapping_df = pd.read_excel(mapping_file)
+        mapping_df = load_excel(mapping_file)
         mapping_df = preprocess_mapping_file(mapping_df)
 
     if pred_file:
@@ -285,7 +285,7 @@ def main():
                     st.warning(f"跳过未配置的文件: {filename}")
                     continue
 
-                df = pd.read_excel(f)
+                df = load_excel(f)
                 config = CONFIG['pivot_config'][filename]
                 
                 # ✅ 统一新旧料号替换（所有 sheet 都做）
@@ -309,7 +309,7 @@ def main():
 
             # 写入安全库存 sheet
             if safety_file:
-                df_safety = pd.read_excel(safety_file)
+                df_safety = load_excel(safety_file)
             else:
                 df_safety = download_backup_file("safety_file.xlsx")
             df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
@@ -317,7 +317,7 @@ def main():
 
             # 写入预测文件 sheet
             if pred_file:
-                df_pred = pd.read_excel(pred_file, header = 1)
+                df_pred = load_excel(pred_file, header = 1)
             else:
                 df_pred = download_backup_file("pred_file.xlsx")
             df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
@@ -327,7 +327,7 @@ def main():
             # 写入新旧料号文件 sheet
             # === 在处理成品在制之前，重新加载 mapping_file 全表 ===
             if mapping_file:
-                df_full_mapping = pd.read_excel(mapping_file)
+                df_full_mapping = load_excel(mapping_file)
                 
                 # 设置列名（假设 Excel 里有9列，含封装厂、PC、半成品）
                 df_full_mapping.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
@@ -337,7 +337,7 @@ def main():
             
             # 写入新旧料号文件 sheet
             if mapping_file:
-                df_mapping = pd.read_excel(mapping_file, header = 1)
+                df_mapping = load_excel(mapping_file, header = 1)
             else:
                 df_mapping = download_backup_file("mapping_file.xlsx")
            
@@ -554,7 +554,7 @@ def main():
                 product_inventory_pivoted = None
                 for f in uploaded_files:
                     if f.name == "赛卓-成品库存.xlsx":
-                        df_product_inventory = pd.read_excel(f)
+                        df_product_inventory = load_excel(f)
                         config_inventory = CONFIG['pivot_config']['赛卓-成品库存.xlsx']
                         if 'date_format' in config_inventory and config_inventory['columns'] in df_product_inventory.columns:
                             df_product_inventory = process_date_column(df_product_inventory, config_inventory['columns'], config_inventory['date_format'])
@@ -617,7 +617,7 @@ def main():
                 product_in_progress_pivoted = None
                 for f in uploaded_files:
                     if f.name == "赛卓-成品在制.xlsx":
-                        df_product_in_progress = pd.read_excel(f)
+                        df_product_in_progress = load_excel(f)
                         config_in_progress = CONFIG['pivot_config']['赛卓-成品在制.xlsx']
                         if 'date_format' in config_in_progress and config_in_progress['columns'] in df_product_in_progress.columns:
                             df_product_in_progress = process_date_column(df_product_in_progress, config_in_progress['columns'], config_in_progress['date_format'])
