@@ -9,6 +9,13 @@ from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
 
+@st.cache_data(show_spinner="正在读取上传的 Excel 文件...")
+def load_excel(uploaded_file):
+    return pd.read_excel(uploaded_file)
+
+@st.cache_data(show_spinner="正在解析 GitHub 上的 Excel 文件...")
+def load_excel_from_bytes(byte_content):
+    return pd.read_excel(BytesIO(byte_content))
 
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
 REPO_NAME = "TTTriste06/semi"
@@ -110,7 +117,7 @@ def download_mapping_from_github(path_in_repo):
     })
     if response.status_code == 200:
         content = base64.b64decode(response.json()['content'])
-        df = pd.read_excel(pd.io.common.BytesIO(content))
+        df = load_excel(pd.io.common.BytesIO(content))
         if df.shape[1] >= 6:
             df = preprocess_mapping_file(df)
         else:
