@@ -31,7 +31,6 @@ def main():
 
     if st.button('🚀 提交并生成报告') and uploaded_files:
         mapping_df = pd.read_excel(mapping_file) if mapping_file else download_excel_from_repo("mapping_file.xlsx")
-        mapping_df = preprocess_mapping_file(mapping_df)
 
         with pd.ExcelWriter(OUTPUT_FILE, engine='openpyxl') as writer:
             summary_df = pd.DataFrame()
@@ -46,7 +45,7 @@ def main():
             
                 df = pd.read_excel(f)
             
-                # ✅ 统一新旧料号映射（若该文件定义了列名映射）
+                # 统一新旧料号映射（若该文件定义了列名映射）
                 if filename in COLUMN_MAPPING:
                     mapping = COLUMN_MAPPING[filename]
                     spec_col = mapping["规格"]
@@ -62,12 +61,14 @@ def main():
                         st.warning(f"⚠️ 文件 {filename} 缺少字段: {spec_col}, {prod_col}, {wafer_col}")
                 else:
                     st.info(f"📂 文件 {filename} 未定义映射字段，跳过 apply_full_mapping")
-            
+
+                # 透视
                 pivoted = create_pivot(df, PIVOT_CONFIG[filename], filename, mapping_df)
                 sheet_name = filename.replace('.xlsx', '')[:30]
                 pivoted.to_excel(writer, sheet_name=sheet_name, index=False)
                 adjust_column_width(writer, sheet_name, pivoted)
 
+                # 提取汇总sheet的信息
                 if filename == "赛卓-未交订单.xlsx":
                     summary_df = pivoted[['晶圆品名', '规格', '品名']].drop_duplicates()
                     pending_df = pivoted.copy()
