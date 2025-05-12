@@ -775,6 +775,12 @@ def main():
             max_row = 2  
             max_col = summary_sheet.max_column
             add_black_border(summary_sheet, max_row, max_col)
+            
+            end_time = time.time()
+            st.write(f"预测部分运行耗时: {end_time - start_time:.2f} 秒")
+
+               
+
                  
 
 
@@ -782,11 +788,7 @@ def main():
         # 下载按钮
         with open(CONFIG['output_file'], 'rb') as f:
             st.download_button('下载汇总报告', f, CONFIG['output_file'])
-            end_time = time.time()
-            print(f"预测部分运行耗时: {end_time - start_time:.2f} 秒")
-
-               
-
+        
 
 
 if __name__ == '__main__':
