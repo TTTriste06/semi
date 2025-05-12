@@ -309,12 +309,42 @@ def main():
             adjust_column_width(writer, '赛卓-安全库存', df_safety)
 
             # 写入预测文件 sheet
+            # === 预测 sheet 处理（保留第1行大标题 + 第2行表头） ===
             if pred_file:
-                df_pred = pd.read_excel(pred_file)
+                df_pred_raw = pd.read_excel(pred_file, header=None)
             else:
-                df_pred = download_backup_file("pred_file.xlsx")
-            df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
-            adjust_column_width(writer, '赛卓-预测', df_pred)
+                df_pred_raw = download_backup_file("pred_file.xlsx")
+            
+            # 第1行是大标题行，第2行是列名
+            title_row = df_pred_raw.iloc[0].tolist()
+            column_names = df_pred_raw.iloc[1].tolist()
+            df_pred = df_pred_raw.iloc[2:].copy()
+            df_pred.columns = column_names
+            df_pred = df_pred.reset_index(drop=True)
+            
+            # 创建工作表
+            sheet_name = '赛卓-预测'
+            worksheet = writer.book.create_sheet(sheet_name)
+            writer.sheets[sheet_name] = worksheet
+            
+            # 写入第1行：大标题
+            for col_idx, value in enumerate(title_row, start=1):
+                worksheet.cell(row=1, column=col_idx, value=value)
+            
+            # 写入第2行：表头
+            for col_idx, value in enumerate(column_names, start=1):
+                worksheet.cell(row=2, column=col_idx, value=value)
+                worksheet.cell(row=2, column=col_idx).alignment = Alignment(horizontal='center', vertical='center')
+                worksheet.cell(row=2, column=col_idx).font = Font(bold=True)
+            
+            # 写入数据行（从第3行开始）
+            for row_idx, row in df_pred.iterrows():
+                for col_idx, value in enumerate(row, start=1):
+                    worksheet.cell(row=row_idx + 3, column=col_idx, value=value)
+            
+            # 自动调整列宽
+            adjust_column_width(writer, sheet_name, df_pred)
+
 
             # 写入新旧料号文件 sheet
             # === 在处理成品在制之前，重新加载 mapping_file 全表 ===
@@ -369,6 +399,7 @@ def main():
             from openpyxl.utils import get_column_letter
             last_col_letter = get_column_letter(len(df_mapping.columns))
             ws.auto_filter.ref = f"A2:{last_col_letter}2"
+            df_pred = read_excel()
 
             # 定义新的列名
             new_column_names = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
