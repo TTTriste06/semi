@@ -3,7 +3,7 @@ import pandas as pd
 from openpyxl import load_workbook
 
 from config import CONFIG, OUTPUT_FILE, PIVOT_CONFIG, FULL_MAPPING_COLUMNS
-from github_utils import upload_to_github, download_backup_file
+from github_utils import upload_to_github, download_excel_from_url, download_excel_from_repo
 from preprocessing import preprocess_mapping_file
 from pivot_processor import create_pivot
 from excel_utils import adjust_column_width, auto_adjust_column_width_by_worksheet, add_black_border
@@ -30,7 +30,7 @@ def main():
         upload_to_github(mapping_file, "mapping_file.xlsx", "上传新旧料号文件")
 
     if st.button('🚀 提交并生成报告') and uploaded_files:
-        mapping_df = pd.read_excel(mapping_file) if mapping_file else download_backup_file("mapping_file.xlsx")
+        mapping_df = pd.read_excel(mapping_file) if mapping_file else download_excel_from_repo("mapping_file.xlsx")
         mapping_df = preprocess_mapping_file(mapping_df)
 
         with pd.ExcelWriter(OUTPUT_FILE, engine='openpyxl') as writer:
@@ -58,7 +58,7 @@ def main():
             summary_sheet = writer.sheets['汇总']
 
             # 合并安全库存
-            df_safety = pd.read_excel(safety_file) if safety_file else download_backup_file("safety_file.xlsx")
+            df_safety = pd.read_excel(safety_file) if safety_file else download_excel_from_repo("safety_file.xlsx")
             merged_summary_df, df_safety = merge_safety_inventory(summary_df, df_safety, summary_sheet)
 
             # 合并未交订单
@@ -67,7 +67,7 @@ def main():
                 _ = merge_unfulfilled_orders(summary_sheet, pending_df, start_col)
 
             # 合并预测文件
-            df_pred = pd.read_excel(pred_file) if pred_file else download_backup_file("pred_file.xlsx")
+            df_pred = pd.read_excel(pred_file) if pred_file else download_excel_from_repo("pred_file.xlsx")
             df_pred = merge_prediction_data(summary_sheet, df_pred, summary_df)
 
             # 标红未匹配预测
