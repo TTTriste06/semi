@@ -9,13 +9,6 @@ from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
 
-@st.cache_data(show_spinner="正在读取上传的 Excel 文件...")
-def load_excel(uploaded_file):
-    return load_excel(uploaded_file)
-
-@st.cache_data(show_spinner="正在解析 GitHub 上的 Excel 文件...")
-def load_excel_from_bytes(byte_content):
-    return load_excel(BytesIO(byte_content))
 
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
 REPO_NAME = "TTTriste06/semi"
@@ -117,7 +110,7 @@ def download_mapping_from_github(path_in_repo):
     })
     if response.status_code == 200:
         content = base64.b64decode(response.json()['content'])
-        df = load_excel(pd.io.common.BytesIO(content))
+        df = pd.read_excel(pd.io.common.BytesIO(content))
         if df.shape[1] >= 6:
             df = preprocess_mapping_file(df)
         else:
@@ -137,7 +130,7 @@ def download_excel_from_github(url, token=None):
     if 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' not in content_type:
         raise ValueError("下载的不是 Excel 文件，请检查 GitHub 链接或权限")
 
-    return load_excel(BytesIO(response.content))
+    return pd.read_excel(BytesIO(response.content))
 
 def download_backup_file(file_name):
     api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{file_name}"
@@ -156,7 +149,7 @@ def download_backup_file(file_name):
     file_bytes = BytesIO(base64.b64decode(content))
 
     try:
-        df = load_excel_from_bytes(file_bytes.read())
+        df = pd.read_excel(file_bytes)
     except Exception as e:
         st.warning(f"⚠️ {file_name} 解析 Excel 失败：{e}，将创建空 sheet。")
         return pd.DataFrame()
@@ -263,7 +256,7 @@ def main():
     # 加载 mapping_file DataFrame
     mapping_df = None
     if mapping_file:
-        mapping_df = load_excel(mapping_file)
+        mapping_df = pd.read_excel(mapping_file)
         mapping_df = preprocess_mapping_file(mapping_df)
 
     if pred_file:
@@ -285,7 +278,7 @@ def main():
                     st.warning(f"跳过未配置的文件: {filename}")
                     continue
 
-                df = load_excel(f)
+                df = pd.read_excel(f)
                 config = CONFIG['pivot_config'][filename]
                 
                 # ✅ 统一新旧料号替换（所有 sheet 都做）
@@ -309,7 +302,7 @@ def main():
 
             # 写入安全库存 sheet
             if safety_file:
-                df_safety = load_excel(safety_file)
+                df_safety = pd.read_excel(safety_file)
             else:
                 df_safety = download_backup_file("safety_file.xlsx")
             df_safety.to_excel(writer, sheet_name='赛卓-安全库存', index=False)
@@ -317,7 +310,7 @@ def main():
 
             # 写入预测文件 sheet
             if pred_file:
-                df_pred = load_excel(pred_file, header = 1)
+                df_pred = pd.read_excel(pred_file, header = 1)
             else:
                 df_pred = download_backup_file("pred_file.xlsx")
             df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
@@ -327,7 +320,7 @@ def main():
             # 写入新旧料号文件 sheet
             # === 在处理成品在制之前，重新加载 mapping_file 全表 ===
             if mapping_file:
-                df_full_mapping = load_excel(mapping_file)
+                df_full_mapping = pd.read_excel(mapping_file)
                 
                 # 设置列名（假设 Excel 里有9列，含封装厂、PC、半成品）
                 df_full_mapping.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名', '封装厂', 'PC', '半成品']
@@ -337,7 +330,7 @@ def main():
             
             # 写入新旧料号文件 sheet
             if mapping_file:
-                df_mapping = load_excel(mapping_file, header = 1)
+                df_mapping = pd.read_excel(mapping_file, header = 1)
             else:
                 df_mapping = download_backup_file("mapping_file.xlsx")
            
@@ -554,7 +547,7 @@ def main():
                 product_inventory_pivoted = None
                 for f in uploaded_files:
                     if f.name == "赛卓-成品库存.xlsx":
-                        df_product_inventory = load_excel(f)
+                        df_product_inventory = pd.read_excel(f)
                         config_inventory = CONFIG['pivot_config']['赛卓-成品库存.xlsx']
                         if 'date_format' in config_inventory and config_inventory['columns'] in df_product_inventory.columns:
                             df_product_inventory = process_date_column(df_product_inventory, config_inventory['columns'], config_inventory['date_format'])
@@ -617,7 +610,7 @@ def main():
                 product_in_progress_pivoted = None
                 for f in uploaded_files:
                     if f.name == "赛卓-成品在制.xlsx":
-                        df_product_in_progress = load_excel(f)
+                        df_product_in_progress = pd.read_excel(f)
                         config_in_progress = CONFIG['pivot_config']['赛卓-成品在制.xlsx']
                         if 'date_format' in config_in_progress and config_in_progress['columns'] in df_product_in_progress.columns:
                             df_product_in_progress = process_date_column(df_product_in_progress, config_in_progress['columns'], config_in_progress['date_format'])
@@ -662,7 +655,6 @@ def main():
                         ]
                         
                         # 提取四列信息
-                        # 提取四列信息
                         semi_info_table = semi_rows[['新规格', '新品名', '新晶圆品名', '半成品']].copy()
                         
                         # 数值列（未交数据列）
@@ -691,32 +683,32 @@ def main():
                         semi_info_table = semi_info_table[semi_info_table['未交数据和'] != 0].reset_index(drop=True)
                         
                         # 遍历 semi_info_table，去汇总 sheet 查找对应行（只用新规格、新晶圆品名、新品名）
+                        # ✅ 构建一次匹配字典：key=(规格, 晶圆品名, 品名)，value=row_idx
+                        summary_match_dict = {
+                            (str(summary_sheet.cell(row=row_idx, column=2).value),
+                             str(summary_sheet.cell(row=row_idx, column=1).value),
+                             str(summary_sheet.cell(row=row_idx, column=3).value)): row_idx
+                            for row_idx in range(3, summary_sheet.max_row + 1)
+                        }
+                        
+                        # ✅ 执行匹配并更新半成品列
                         for idx, row in semi_info_table.iterrows():
-                            semi_spec = row['新规格']
-                            semi_wafer = row['新晶圆品名']
-                            semi_prod = row['新品名']
+                            semi_spec = str(row['新规格'])
+                            semi_wafer = str(row['新晶圆品名'])
+                            semi_prod = str(row['新品名'])
                             pending_sum = row['未交数据和']
                         
-                            found = False
+                            match_row_idx = summary_match_dict.get((semi_spec, semi_wafer, semi_prod))
                         
-                            for row_idx in range(3, summary_sheet.max_row + 1):
-                                summary_wf = summary_sheet.cell(row=row_idx, column=1).value
-                                summary_spec = summary_sheet.cell(row=row_idx, column=2).value
-                                summary_prod = summary_sheet.cell(row=row_idx, column=3).value
-                        
-                                if str(summary_spec) == str(semi_spec) and str(summary_wf) == str(semi_wafer) and str(summary_prod) == str(semi_prod):
-                                    # 找到匹配行 → 在“半成品”列写入 pending_sum
-                                    for col_idx in range(1, summary_sheet.max_column + 1):
-                                        header = summary_sheet.cell(row=2, column=col_idx).value
-                                        if header == '半成品':
-                                            summary_sheet.cell(row=row_idx, column=col_idx, value=pending_sum)
-                                            break
-                                    found = True
-                                    break  # 已找到，无需继续查找
-                        
-                            # 在 semi_info_table 里记录是否匹配成功
-                            semi_info_table.at[idx, '是否在汇总匹配'] = 1 if found else 0
-                        
+                            if match_row_idx:
+                                for col_idx in range(1, summary_sheet.max_column + 1):
+                                    if summary_sheet.cell(row=2, column=col_idx).value == '半成品':
+                                        summary_sheet.cell(row=match_row_idx, column=col_idx, value=pending_sum)
+                                        semi_info_table.at[idx, '是否在汇总匹配'] = 1
+                                        break
+                            else:
+                                semi_info_table.at[idx, '是否在汇总匹配'] = 0
+
 
 
                         # === 第一步：标记成品未匹配行为 True ===
