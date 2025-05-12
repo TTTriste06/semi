@@ -5,6 +5,11 @@ GITHUB_TOKEN_KEY = "GITHUB_TOKEN"  # 用于 st.secrets 获取
 REPO_NAME = "TTTriste06/semi"
 BRANCH = "main"
 
+# 选择月份
+CONFIG = {
+    "selected_month": None
+}
+
 # 默认输出文件名
 OUTPUT_FILE = f"运营数据订单-在制-库存汇总报告_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
