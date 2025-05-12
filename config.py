@@ -56,10 +56,3 @@ FULL_MAPPING_COLUMNS = [
     '新规格', '新品名', '新晶圆品名',
     '封装厂', 'PC', '半成品'
 ]
-
-# 精简版本用于 apply_mapping_and_merge()
-MAPPING_COLUMNS = [
-    '旧规格', '旧品名', '旧晶圆品名',
-    '新规格', '新品名', '新晶圆品名'
-]
-
