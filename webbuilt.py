@@ -142,6 +142,9 @@ def download_backup_file(file_name):
 
     try:
         df = pd.read_excel(file_bytes)
+        if "mapping_file" in file_name:
+            if df.shape[1] >= 6:
+                df = preprocess_mapping_file(df)
     except Exception as e:
         st.warning(f"⚠️ {file_name} 解析 Excel 失败：{e}，将创建空 sheet。")
         return pd.DataFrame()
@@ -224,6 +227,38 @@ def add_black_border(ws, row_count, col_count):
         for cell in row:
             cell.border = border
 
+def file_md5(file_bytes):
+    """计算文件内容的 md5 哈希值"""
+    hasher = hashlib.md5()
+    hasher.update(file_bytes.read())
+    file_bytes.seek(0)  # 重置指针以防止后续读取出错
+    return hasher.hexdigest()
+
+def compare_uploaded_and_github_file(uploaded_file, github_file_name):
+    """比较用户上传文件和 GitHub 上的文件内容是否一致"""
+    uploaded_hash = file_md5(uploaded_file)
+
+    api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{github_file_name}"
+    response = requests.get(api_url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
+
+    if response.status_code != 200:
+        st.warning(f"⚠️ 无法获取 GitHub 上的 {github_file_name}：状态码 {response.status_code}")
+        return
+
+    github_content = response.json().get("content")
+    if not github_content:
+        st.warning(f"⚠️ GitHub 上的 {github_file_name} 内容为空")
+        return
+
+    github_bytes = BytesIO(base64.b64decode(github_content))
+    github_hash = file_md5(github_bytes)
+
+    if uploaded_hash != github_hash:
+        st.warning("⚠️ 上传的新旧料号文件与 GitHub 上的版本不一致，可能导致结果不同！")
+    else:
+        st.success("✅ 上传的新旧料号文件与 GitHub 上的版本完全一致")
+
+
 def main():
     st.set_page_config(
         page_title='我是标题',
@@ -250,6 +285,14 @@ def main():
     if mapping_file:
         mapping_df = pd.read_excel(mapping_file)
         mapping_df = preprocess_mapping_file(mapping_df)
+
+    if mapping_file:
+    mapping_df = pd.read_excel(mapping_file)
+    mapping_df = preprocess_mapping_file(mapping_df)
+    
+    # ⚠️ 进行一致性对比
+    compare_uploaded_and_github_file(mapping_file, "mapping_file.xlsx")
+
 
     if pred_file:
         upload_to_github(pred_file, "pred_file.xlsx", "上传预测文件")
