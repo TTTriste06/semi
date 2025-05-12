@@ -11,8 +11,7 @@ from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
 
 
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
-REPO_OWNER = 'TTTriste06'
-REPO_NAME = 'semi'
+REPO_NAME = "TTTriste06/semi"
 BRANCH = "main"
 
 CONFIG = {
