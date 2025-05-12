@@ -36,6 +36,20 @@ def apply_full_mapping(df, mapping_df, spec_col, prod_col, wafer_col):
     df[spec_col] = df['新规格'].combine_first(df[spec_col])
     df[prod_col] = df['新品名'].combine_first(df[prod_col])
 
+    # 打印出被替换的记录
+    if show_changes:
+        changed = df[
+            (df[spec_col] != df['_原规格']) |
+            (df[prod_col] != df['_原品名']) |
+            (df[wafer_col] != df['_原晶圆'])
+        ][[wafer_col, spec_col, prod_col, '_原晶圆', '_原规格', '_原品名']]
+
+        if not changed.empty:
+            st.write("✅ 以下记录发生了新旧料号替换：")
+            st.dataframe(changed)
+        else:
+            st.info("ℹ️ 没有任何行发生新旧料号替换")
+
     # 删除 merge 带来的辅助列
     df.drop(columns=['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名'], errors='ignore', inplace=True)
 
