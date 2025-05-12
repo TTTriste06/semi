@@ -234,29 +234,26 @@ def file_md5(file_bytes):
     file_bytes.seek(0)  # 重置指针以防止后续读取出错
     return hasher.hexdigest()
 
-def compare_uploaded_and_github_file(uploaded_file, github_file_name):
-    """比较用户上传文件和 GitHub 上的文件内容是否一致"""
-    uploaded_hash = file_md5(uploaded_file)
-
-    api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{github_file_name}"
-    response = requests.get(api_url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
-
-    if response.status_code != 200:
-        st.warning(f"⚠️ 无法获取 GitHub 上的 {github_file_name}：状态码 {response.status_code}")
+def compare_mapping_df(uploaded_file, github_file_name):
+    try:
+        uploaded_df = pd.read_excel(uploaded_file).iloc[:, :6]
+        uploaded_df.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名']
+    except Exception as e:
+        st.error(f"上传文件读取失败: {e}")
         return
 
-    github_content = response.json().get("content")
-    if not github_content:
-        st.warning(f"⚠️ GitHub 上的 {github_file_name} 内容为空")
+    github_df = download_backup_file(github_file_name)
+    if github_df.empty:
+        st.warning("无法从 GitHub 下载文件用于对比")
         return
 
-    github_bytes = BytesIO(base64.b64decode(github_content))
-    github_hash = file_md5(github_bytes)
+    github_df = github_df.iloc[:, :6]
+    github_df.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名']
 
-    if uploaded_hash != github_hash:
-        st.warning("⚠️ 上传的新旧料号文件与 GitHub 上的版本不一致，可能导致结果不同！")
+    if uploaded_df.equals(github_df):
+        st.success("✅ 上传的新旧料号内容与 GitHub 上完全一致（按逻辑字段）")
     else:
-        st.success("✅ 上传的新旧料号文件与 GitHub 上的版本完全一致")
+        st.warning("⚠️ 上传的新旧料号内容与 GitHub 上不一致，请检查是否编辑过文件（即使内容看起来一样）")
 
 
 def main():
@@ -286,12 +283,7 @@ def main():
         mapping_df = pd.read_excel(mapping_file)
         mapping_df = preprocess_mapping_file(mapping_df)
 
-    if mapping_file:
-        mapping_df = pd.read_excel(mapping_file)
-        mapping_df = preprocess_mapping_file(mapping_df)
-    
-        # ⚠️ 进行一致性对比
-        compare_uploaded_and_github_file(mapping_file, "mapping_file.xlsx")
+        compare_mapping_df(mapping_file, "mapping_file.xlsx")
 
 
     if pred_file:
