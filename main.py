@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from openpyxl import load_workbook
 
-from config import CONFIG, OUTPUT_FILE, PIVOT_CONFIG, FULL_MAPPING_COLUMNS
+from config import CONFIG, OUTPUT_FILE, PIVOT_CONFIG, FULL_MAPPING_COLUMNS, COLUMN_MAPPING
 from github_utils import upload_to_github, download_excel_from_url, download_excel_from_repo
 from preprocessing import preprocess_mapping_file
 from pivot_processor import create_pivot
@@ -39,11 +39,30 @@ def main():
 
             for f in uploaded_files:
                 filename = f.name
+            
                 if filename not in PIVOT_CONFIG:
-                    st.warning(f"⚠️ 未配置文件：{filename}")
+                    st.warning(f"跳过未配置的文件: {filename}")
                     continue
-
+            
                 df = pd.read_excel(f)
+            
+                # ✅ 统一新旧料号映射（若该文件定义了列名映射）
+                if filename in COLUMN_MAPPING:
+                    mapping = COLUMN_MAPPING[filename]
+                    spec_col = mapping["规格"]
+                    prod_col = mapping["品名"]
+                    wafer_col = mapping["晶圆品名"]
+            
+                    if all(col in df.columns for col in [spec_col, prod_col, wafer_col]):
+                        try:
+                            df = apply_full_mapping(df, mapping_df, spec_col, prod_col, wafer_col)
+                        except Exception as e:
+                            st.warning(f"⚠️ 文件 {filename} 替换失败: {e}")
+                    else:
+                        st.warning(f"⚠️ 文件 {filename} 缺少字段: {spec_col}, {prod_col}, {wafer_col}")
+                else:
+                    st.info(f"📂 文件 {filename} 未定义映射字段，跳过 apply_full_mapping")
+            
                 pivoted = create_pivot(df, PIVOT_CONFIG[filename], filename, mapping_df)
                 sheet_name = filename.replace('.xlsx', '')[:30]
                 pivoted.to_excel(writer, sheet_name=sheet_name, index=False)
