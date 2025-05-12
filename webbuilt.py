@@ -4,11 +4,11 @@ import pandas as pd
 import requests
 import base64
 import hashlib
-import time
 from io import BytesIO
 from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
+
 
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
 REPO_NAME = "TTTriste06/semi"
@@ -54,29 +54,21 @@ CONFIG = {
     }
 }
 
-def upload_to_github(uploaded_file, path_in_repo, commit_message):
-    path_in_repo = path_in_repo.lower()
-
-    if uploaded_file is None:
-        st.warning("上传失败：未提供文件")
-        return
-
+def upload_to_github(file, path_in_repo, commit_message):
     api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{path_in_repo}"
+    
+    file.seek(0)  # 确保指针在开头
+    file_content = file.read()
+    encoded_content = base64.b64encode(file_content).decode('utf-8')
 
-    # 获取当前 GitHub 上的 SHA
+    # 先获取文件 SHA（如果存在）
     response = requests.get(api_url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
     if response.status_code == 200:
         sha = response.json()['sha']
-        st.write(f"当前 sha: {sha}")
     else:
         sha = None
-        st.warning(f"获取 sha 失败: {response.text}")
 
-    # 读取上传文件内容并 base64 编码
-    uploaded_file.seek(0)
-    file_content = uploaded_file.read()
-    encoded_content = base64.b64encode(file_content).decode('utf-8')
-
+    # 构造 payload
     payload = {
         "message": commit_message,
         "content": encoded_content,
@@ -85,14 +77,14 @@ def upload_to_github(uploaded_file, path_in_repo, commit_message):
     if sha:
         payload["sha"] = sha
 
-    # 上传或更新文件
+    # 上传文件
     response = requests.put(api_url, json=payload, headers={"Authorization": f"token {GITHUB_TOKEN}"})
+
+    # 结果反馈
     if response.status_code in [200, 201]:
-        st.success(f"✅ 文件 {path_in_repo} 上传成功！")
-        st.write(response.json())
+        st.success(f"{path_in_repo} 上传成功！")
     else:
-        st.error(f"❌ 上传失败: {response.status_code}")
-        st.code(response.text)
+        st.error(f"上传失败: {response.json()}")
 
 
 def preprocess_mapping_file(df):
@@ -198,7 +190,8 @@ def create_pivot(df, config, filename, mapping_df=None):
     if mapping_df is not None and filename == "赛卓-未交订单.xlsx":
         pivoted = apply_mapping_and_merge(pivoted, mapping_df)
 
-    if CONFIG['selected_month']:
+
+    if CONFIG['selected_month'] and filename == "赛卓-未交订单.xlsx":
         history_cols = [col for col in pivoted.columns if '_' in col and col.split('_')[-1][:4].isdigit() and col.split('_')[-1] < CONFIG['selected_month']]
         history_order_cols = [col for col in history_cols if '订单数量' in col and '未交订单数量' not in col]
         history_pending_cols = [col for col in history_cols if '未交订单数量' in col]
@@ -232,7 +225,6 @@ def add_black_border(ws, row_count, col_count):
             cell.border = border
 
 def main():
-    start_time = time.time()
     st.set_page_config(
         page_title='我是标题',
         page_icon=' ',
@@ -281,7 +273,13 @@ def main():
                 df = pd.read_excel(f)
                 config = CONFIG['pivot_config'][filename]
                 
-            
+                # ✅ 统一新旧料号替换（所有 sheet 都做）
+                if mapping_df is not None and all(col in df.columns for col in ['晶圆品名', '规格', '品名']):
+                    df = apply_mapping_and_merge(df, mapping_df)
+                
+                if 'date_format' in config and config['columns'] in df.columns:
+                    df = process_date_column(df, config['columns'], config['date_format'])
+
 
                 pivoted = create_pivot(df, config, filename, mapping_df)
                 sheet_name = filename[:30].rstrip('.xlsx')
@@ -304,12 +302,11 @@ def main():
 
             # 写入预测文件 sheet
             if pred_file:
-                df_pred = pd.read_excel(pred_file, header = 1)
+                df_pred = pd.read_excel(pred_file)
             else:
                 df_pred = download_backup_file("pred_file.xlsx")
             df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
             adjust_column_width(writer, '赛卓-预测', df_pred)
-
 
             # 写入新旧料号文件 sheet
             # === 在处理成品在制之前，重新加载 mapping_file 全表 ===
@@ -361,6 +358,7 @@ def main():
                 ws.cell(row=1, column=col).font = Font(bold=True)
             
             # 开启 Excel 筛选器（第2行是表头）
+            from openpyxl.utils import get_column_letter
             last_col_letter = get_column_letter(len(df_mapping.columns))
             ws.auto_filter.ref = f"A2:{last_col_letter}2"
 
@@ -767,9 +765,8 @@ def main():
             max_row = 2  
             max_col = summary_sheet.max_column
             add_black_border(summary_sheet, max_row, max_col)
-            end_time = time.time()
-            st.write(f"预测部分运行耗时: {end_time - start_time:.2f} 秒")
 
+                    
 
 
 
