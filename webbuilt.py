@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
 
-
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # 在 Streamlit Cloud 用 secrets
 REPO_NAME = "TTTriste06/semi"
 BRANCH = "main"
@@ -196,11 +195,11 @@ def create_pivot(df, config, filename, mapping_df=None):
     pivoted.columns = [f"{col[0]}_{col[1]}" if isinstance(col, tuple) else col for col in pivoted.columns]
     pivoted = pivoted.reset_index()
 
-    if mapping_df is not None and filename == "赛卓-未交订单.xlsx":
+    if mapping_df is not None:
         pivoted = apply_mapping_and_merge(pivoted, mapping_df)
 
 
-    if CONFIG['selected_month'] and filename == "赛卓-未交订单.xlsx":
+    if CONFIG['selected_month']:
         history_cols = [col for col in pivoted.columns if '_' in col and col.split('_')[-1][:4].isdigit() and col.split('_')[-1] < CONFIG['selected_month']]
         history_order_cols = [col for col in history_cols if '订单数量' in col and '未交订单数量' not in col]
         history_pending_cols = [col for col in history_cols if '未交订单数量' in col]
