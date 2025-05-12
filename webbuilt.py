@@ -4,7 +4,6 @@ import pandas as pd
 import requests
 import base64
 import hashlib
-import time
 from io import BytesIO
 from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
@@ -234,8 +233,6 @@ def add_black_border(ws, row_count, col_count):
             cell.border = border
 
 def main():
-    start_time = time.time()
-    
     st.set_page_config(
         page_title='我是标题',
         page_icon=' ',
@@ -513,34 +510,18 @@ def main():
                         summary_sheet.cell(row=2, column=start_col+1, value='合计金额').alignment = Alignment(horizontal='center', vertical='center')
                 
                         # 遍历汇总 sheet 的数据行（从第3行开始）
-                        # 构造哈希表
-                        pred_dict = {
-                            (str(row['晶圆品名']), str(row['产品型号']), str(row['ProductionNO.'])): (row['合计数量'], row['合计金额'])
-                            for _, row in df_pred.iterrows()
-                        }
-                        
-                        df_pred['已匹配'] = False
-                        
                         for row_idx in range(3, summary_sheet.max_row + 1):
-                            summary_wf = str(summary_sheet.cell(row=row_idx, column=1).value)
-                            summary_spec = str(summary_sheet.cell(row=row_idx, column=2).value)
-                            summary_prod = str(summary_sheet.cell(row=row_idx, column=3).value)
-                        
-                            match_key = (summary_wf, summary_spec, summary_prod)
-                        
-                            if match_key in pred_dict:
-                                qty, amt = pred_dict[match_key]
-                                summary_sheet.cell(row=row_idx, column=start_col, value=qty)
-                                summary_sheet.cell(row=row_idx, column=start_col + 1, value=amt)
-                        
-                                df_pred.loc[
-                                    (df_pred['晶圆品名'].astype(str) == summary_wf) &
-                                    (df_pred['产品型号'].astype(str) == summary_spec) &
-                                    (df_pred['ProductionNO.'].astype(str) == summary_prod),
-                                    '已匹配'
-                                ] = True
-
-
+                            summary_wf = summary_sheet.cell(row=row_idx, column=1).value
+                            summary_spec = summary_sheet.cell(row=row_idx, column=2).value
+                            summary_prod = summary_sheet.cell(row=row_idx, column=3).value
+                
+                            # 查找预测表匹配行
+                            match = df_pred[
+                                (df_pred['晶圆品名'].astype(str) == str(summary_wf)) &
+                                (df_pred['产品型号'].astype(str) == str(summary_spec)) &
+                                (df_pred['ProductionNO.'].astype(str) == str(summary_prod))
+                            ]
+                
                             if not match.empty:
                                 qty = match['合计数量'].values[0]
                                 amt = match['合计金额'].values[0]
@@ -674,6 +655,7 @@ def main():
                         ]
                         
                         # 提取四列信息
+                        # 提取四列信息
                         semi_info_table = semi_rows[['新规格', '新品名', '新晶圆品名', '半成品']].copy()
                         
                         # 数值列（未交数据列）
@@ -702,32 +684,32 @@ def main():
                         semi_info_table = semi_info_table[semi_info_table['未交数据和'] != 0].reset_index(drop=True)
                         
                         # 遍历 semi_info_table，去汇总 sheet 查找对应行（只用新规格、新晶圆品名、新品名）
-                        # ✅ 构建一次匹配字典：key=(规格, 晶圆品名, 品名)，value=row_idx
-                        summary_match_dict = {
-                            (str(summary_sheet.cell(row=row_idx, column=2).value),
-                             str(summary_sheet.cell(row=row_idx, column=1).value),
-                             str(summary_sheet.cell(row=row_idx, column=3).value)): row_idx
-                            for row_idx in range(3, summary_sheet.max_row + 1)
-                        }
-                        
-                        # ✅ 执行匹配并更新半成品列
                         for idx, row in semi_info_table.iterrows():
-                            semi_spec = str(row['新规格'])
-                            semi_wafer = str(row['新晶圆品名'])
-                            semi_prod = str(row['新品名'])
+                            semi_spec = row['新规格']
+                            semi_wafer = row['新晶圆品名']
+                            semi_prod = row['新品名']
                             pending_sum = row['未交数据和']
                         
-                            match_row_idx = summary_match_dict.get((semi_spec, semi_wafer, semi_prod))
+                            found = False
                         
-                            if match_row_idx:
-                                for col_idx in range(1, summary_sheet.max_column + 1):
-                                    if summary_sheet.cell(row=2, column=col_idx).value == '半成品':
-                                        summary_sheet.cell(row=match_row_idx, column=col_idx, value=pending_sum)
-                                        semi_info_table.at[idx, '是否在汇总匹配'] = 1
-                                        break
-                            else:
-                                semi_info_table.at[idx, '是否在汇总匹配'] = 0
-
+                            for row_idx in range(3, summary_sheet.max_row + 1):
+                                summary_wf = summary_sheet.cell(row=row_idx, column=1).value
+                                summary_spec = summary_sheet.cell(row=row_idx, column=2).value
+                                summary_prod = summary_sheet.cell(row=row_idx, column=3).value
+                        
+                                if str(summary_spec) == str(semi_spec) and str(summary_wf) == str(semi_wafer) and str(summary_prod) == str(semi_prod):
+                                    # 找到匹配行 → 在“半成品”列写入 pending_sum
+                                    for col_idx in range(1, summary_sheet.max_column + 1):
+                                        header = summary_sheet.cell(row=2, column=col_idx).value
+                                        if header == '半成品':
+                                            summary_sheet.cell(row=row_idx, column=col_idx, value=pending_sum)
+                                            break
+                                    found = True
+                                    break  # 已找到，无需继续查找
+                        
+                            # 在 semi_info_table 里记录是否匹配成功
+                            semi_info_table.at[idx, '是否在汇总匹配'] = 1 if found else 0
+                        
 
 
                         # === 第一步：标记成品未匹配行为 True ===
@@ -791,20 +773,15 @@ def main():
             max_row = 2  
             max_col = summary_sheet.max_column
             add_black_border(summary_sheet, max_row, max_col)
-            
-            end_time = time.time()
-            st.write(f"预测部分运行耗时: {end_time - start_time:.2f} 秒")
 
-               
-
-                 
+                    
 
 
 
         # 下载按钮
         with open(CONFIG['output_file'], 'rb') as f:
             st.download_button('下载汇总报告', f, CONFIG['output_file'])
-        
+
 
 
 if __name__ == '__main__':
