@@ -195,9 +195,8 @@ def create_pivot(df, config, filename, mapping_df=None):
     pivoted.columns = [f"{col[0]}_{col[1]}" if isinstance(col, tuple) else col for col in pivoted.columns]
     pivoted = pivoted.reset_index()
 
-    if mapping_df is not None:
+     if mapping_df is not None and filename == "赛卓-未交订单.xlsx":
         pivoted = apply_mapping_and_merge(pivoted, mapping_df)
-
 
     if CONFIG['selected_month']:
         history_cols = [col for col in pivoted.columns if '_' in col and col.split('_')[-1][:4].isdigit() and col.split('_')[-1] < CONFIG['selected_month']]
@@ -282,13 +281,7 @@ def main():
                 df = pd.read_excel(f)
                 config = CONFIG['pivot_config'][filename]
                 
-                # ✅ 统一新旧料号替换（所有 sheet 都做）
-                if mapping_df is not None and all(col in df.columns for col in ['晶圆品名', '规格', '品名']):
-                    df = apply_mapping_and_merge(df, mapping_df)
-                
-                if 'date_format' in config and config['columns'] in df.columns:
-                    df = process_date_column(df, config['columns'], config['date_format'])
-
+            
 
                 pivoted = create_pivot(df, config, filename, mapping_df)
                 sheet_name = filename[:30].rstrip('.xlsx')
