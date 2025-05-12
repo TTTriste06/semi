@@ -310,7 +310,7 @@ def main():
 
             # 写入预测文件 sheet
             if pred_file:
-                df_pred = pd.read_excel(pred_file)
+                df_pred = pd.read_excel(pred_file, header = 1)
             else:
                 df_pred = download_backup_file("pred_file.xlsx")
             df_pred.to_excel(writer, sheet_name='赛卓-预测', index=False)
