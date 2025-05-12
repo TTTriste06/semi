@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 
-from config import GITHUB_TOKEN_KEY, REPO_NAME, BRANCH, MAPPING_COLUMNS
+from config import GITHUB_TOKEN_KEY, REPO_NAME, BRANCH
 
 
 def upload_to_github(file, path_in_repo, commit_message):
