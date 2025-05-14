@@ -86,15 +86,6 @@ def upload_to_github(file, path_in_repo, commit_message):
     else:
         st.error(f"上传失败: {response.json()}")
 
-
-def preprocess_mapping_file(df):
-    # 只取前6列
-    df = df.iloc[:, :6]
-    # 重命名列
-    df.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名']
-    return df
-
-
 def download_mapping_from_github(path_in_repo):
     api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{path_in_repo}"
     response = requests.get(api_url, headers={
@@ -147,6 +138,14 @@ def download_backup_file(file_name):
         return pd.DataFrame()
 
     return df
+
+def preprocess_mapping_file(df):
+    # 只取前6列
+    df = df.iloc[:, :6]
+    # 重命名列
+    df.columns = ['旧规格', '旧品名', '旧晶圆品名', '新规格', '新品名', '新晶圆品名']
+    return df
+
         
 def process_date_column(df, date_col, date_format):
     if pd.api.types.is_numeric_dtype(df[date_col]):
